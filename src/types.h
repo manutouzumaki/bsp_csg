@@ -106,7 +106,6 @@ struct Plane
 {
     Vec3 n;
     f32 d;
-
 };
 
 struct GameState
