@@ -124,7 +124,6 @@ static Win32Renderer Win32InitD3D11(HWND window, i32 width, i32 height)
     // create the depth stencil texture
     ID3D11Texture2D* depthStencilTexture = 0;
     D3D11_TEXTURE2D_DESC depthStencilTextureDesc;
-    ZeroMemory(&depthStencilTextureDesc, sizeof(depthStencilTextureDesc));
     depthStencilTextureDesc.Width = width;
     depthStencilTextureDesc.Height = height;
     depthStencilTextureDesc.MipLevels = 1;
@@ -215,7 +214,7 @@ static Win32Renderer Win32InitD3D11(HWND window, i32 width, i32 height)
     wireFrameRasterizerDesc.DepthClipEnable = true;
     renderer.device->CreateRasterizerState(&wireFrameRasterizerDesc, &renderer.wireFrameRasterizer);
 
-    renderer.deviceContext->OMSetRenderTargets(1, &renderer.renderTargetView, 0);
+    renderer.deviceContext->OMSetRenderTargets(1, &renderer.renderTargetView, renderer.depthStencilView);
     renderer.deviceContext->OMSetDepthStencilState(renderer.depthStencilOn, 1);
     renderer.deviceContext->OMSetBlendState(renderer.alphaBlendEnable, 0, 0xffffffff);
     renderer.deviceContext->RSSetState(renderer.fillRasterizerCullBack);

@@ -116,7 +116,7 @@ bool GetIntersection(Vec3 n1, Vec3 n2, Vec3 n3, f32 d1, f32 d2, f32 d3, Vertex *
         return false;
     }
     Vec3 pos = (-d1 * Vec3Cross(n2, n3) -d2 * Vec3Cross(n3, n1) -d3 * Vec3Cross(n1, n2)) / denom;
-    i32 colorIndex = (i32)(d1 * d2 + d3) % ARRAY_LENGTH(colorList);
+    i32 colorIndex = rand() % ARRAY_LENGTH(colorList);
     Vec4 col = colorList[colorIndex];
     *vertex = {pos, col};
     return true;
@@ -298,8 +298,8 @@ i32 main(void)
     renderer.deviceContext->PSSetShader(shader.fragment, 0, 0);
 
     // create the const buffer data to be pass to the gpu
-    Vec3 pos = {0, 5, -20};
-    Vec3 tar = {0, 0,  0};
+    Vec3 pos = {0, 1.2, -1.5};
+    Vec3 tar = {0, 1,  0};
     Vec3 up  = {0, 1,  0};
     CBuffer cbuffer = {};
     cbuffer.view = Mat4LookAt(pos, tar, up);
