@@ -3,11 +3,17 @@
 
 #include <math.h>
 
-#define VEC_EPSILON 0.000001f
 #define MAT_EPSILON 0.000001f
+#define VEC_EPSILON 1e-6f
+//#define VEC_EPSILON 0.000001f
 #define PI 3.14159265359
 #define TO_RAD(value) ((value/180.0f) * PI)
 #define TO_DEG(value) ((value/PI) * 180.0f)
+
+f32 InvLerp(f32 a, f32 b, f32 v)
+{
+    return (v - a) / (b - a);
+}
 
 struct Vec2 
 {

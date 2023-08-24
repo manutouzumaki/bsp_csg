@@ -22,7 +22,10 @@ typedef float f64;
 #define GIGABYTES(value) (MEGABYTES(value)*1024LL)
 #define TERABYTES(value) (GIGABYTES(value)*1024LL)
 
-#define WINDOW_WIDTH  800
-#define WINDOW_HEIGHT 600
+#define WINDOW_WIDTH  1280
+#define WINDOW_HEIGHT 720
+
+#define MAX_DEPTH UINT_MAX
+#define MIN_LEAF_SIZE 10
 
 #endif

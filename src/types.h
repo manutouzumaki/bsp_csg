@@ -65,6 +65,7 @@ struct Vertex
 {
     Vec3 position;
     Vec4 color;
+    Vec2 uv;
 };
 
 struct CBuffer
@@ -86,13 +87,13 @@ struct Face
 
 struct Brush
 {
-    Face faces[256];
+    Face faces[32];
     u32 facesCount;
 };
 
 struct Entity
 {
-    Brush brushes[256];
+    Brush brushes[32];
     u32 brushesCount;
 };
 
@@ -106,6 +107,89 @@ struct Plane
 {
     Vec3 n;
     f32 d;
+};
+
+struct PolygonData
+{
+    std::vector<Vertex> vertices; 
+    Plane plane;
+};
+
+struct CSGBrush
+{
+    std::vector<PolygonData> polygons;
+};
+
+enum PolygonPlane
+{
+    FRONT,
+    BACK,
+    ONPLANE,
+    SPLIT 
+};
+
+enum ClassifyPolygon
+{
+    POLYGON_COPLANAR_WITH_PLANE,
+    POLYGON_IN_FRONT_OF_PLANE,
+    POLYGON_BEHIND_PLANE,
+    POLYGON_STRADDLING_PLANE
+};
+
+enum ClassifyPoint
+{
+    POINT_IN_FRONT_OF_PLANE,
+    POINT_BEHIND_PLANE,
+    POINT_ON_PLANE
+};
+
+struct Poly;
+
+enum BSPState
+{
+    BSP_ROOT,
+    BSP_FRONT,
+    BSP_BACK
+};
+
+enum BSPType
+{
+    BSP_TYPE_NODE,
+    BSP_TYPE_SOLID,
+    BSP_TYPE_EMPTY
+};
+
+struct BSPNode
+{
+    Plane plane;
+    union
+    {
+        struct 
+        {
+            BSPNode *back;
+            BSPNode *front;
+        };
+        BSPNode *child[2];
+    };
+    BSPType type;
+
+    bool IsLeaf() 
+    {
+        if(front == 0 && back == 0)
+            return true;
+        return false;
+    }
+
+    bool IsSolid()
+    {
+        return type == BSP_TYPE_SOLID;
+    }
+
+    BSPNode(BSPType type);
+    BSPNode(BSPNode *front, BSPNode *back, Plane plane);
+
+    ~BSPNode();
+
 };
 
 struct GameState

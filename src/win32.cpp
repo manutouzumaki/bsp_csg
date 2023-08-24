@@ -42,8 +42,6 @@ static HWND Win32CreateWindow(char *name, i32 x, i32 y, i32 width, i32 height)
         x, y, width, height,
         0, 0, instace, 0);
 
-    ShowWindow(window, 1);
-
     return window;
 }
 
