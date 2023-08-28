@@ -12,7 +12,7 @@ typedef uint32_t u32;
 typedef uint64_t u64; 
 
 typedef float f32;
-typedef float f64;
+typedef double f64;
 
 #define ARRAY_LENGTH(array) (sizeof(array)/sizeof(array[0]))
 #define ASSERT(condition) if(!(condition)) { *(int *)0 = 0;} 

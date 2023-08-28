@@ -1,4 +1,5 @@
 #include <windows.h>
+#include <windowsX.h>
 #include <d3d11.h>
 #include <d3dcompiler.h>
 
@@ -13,13 +14,18 @@
 #include "types.h"
 #include "poly.h"
 #include "brush.h"
+#include "input.h"
 
 static bool gRunnig;
+
+static InputState gCurrentInput;
+static InputState gLastInput;
 
 #include "poly.cpp"
 #include "brush.cpp"
 #include "arena.cpp"
 #include "win32.cpp"
+#include "input.cpp"
 
 static void ParseFace(char **current, Face *face, char *end)
 {
@@ -34,7 +40,7 @@ static void ParseFace(char **current, Face *face, char *end)
            &face->textureRotation,
            &face->uScale,
            &face->vScale);
-
+    
     while(**current != '\n') (*current)++;
 }
 
@@ -163,7 +169,7 @@ IBrush *GetIBrush(Brush *brush)
                             Plane plane = GetPlaneFromThreePoints(faces[m].a, faces[m].b, faces[m].c); 
                             f32 dot = Vec3Dot(plane.n, vertex.position);
                             f32 d = plane.d;
-                            if((dot + d) > VEC_EPSILON)
+                            if((dot + d) > EPSILON)
                             {
                                 illegal = true;
                             }
@@ -190,7 +196,11 @@ IBrush *GetIBrush(Brush *brush)
     {
         Plane polygonPlane = GetPlaneFromThreePoints(faces[p].a, faces[p].b, faces[p].c); 
         PolygonData *polygon = polygons.data() + p;
+
+        ASSERT(polygon->vertices.size() >= 3);
+
         Vec3 center = GetCenterOfPolygon(polygon);
+
         
         for(i32 n = 0; n <= polygon->vertices.size() - 3; ++n)
         {
@@ -224,6 +234,30 @@ IBrush *GetIBrush(Brush *brush)
             }
         } 
     }
+
+    /*
+    for(i32 p = 0; p < polygonsCount; ++p)
+    {
+        Plane facePlane = GetPlaneFromThreePoints(faces[p].a, faces[p].b, faces[p].c); 
+        i32 StopHere = 0;
+        PolygonData *polygon = polygons.data() + p;
+        Vec3 a = polygon->vertices[0].position;
+        Vec3 b = polygon->vertices[1].position;
+        Vec3 c = polygon->vertices[2].position;
+        
+        Vec3 ab = Vec3Normalized(b - a);
+        Vec3 ac = Vec3Normalized(c - a);
+        Vec3 n = Vec3Cross(ab, ac);
+        if(Vec3Dot(n, facePlane.n) < VEC_EPSILON)
+        {
+            std::vector<Vertex> tmpVertices = polygon->vertices;
+            for(i32 i = 0; i > tmpVertices.size(); ++i)
+            {
+                polygon->vertices[i] = tmpVertices[(tmpVertices.size()-1)-i];
+            }
+        }
+    }
+    */
 
     IBrush *iBrush = new IBrush;
     for(i32 p = 0; p < polygonsCount; ++p)
@@ -262,11 +296,11 @@ BSPNode::BSPNode(BSPNode *front, BSPNode *back, Plane plane)
 int ClassifyPointToPlane(Vec3 p, Plane plane)
 {
     // Compute signed distance of point from plane
-    float dist = Vec3Dot(plane.n, p) + plane.d;
+    f32 dist = Vec3Dot(plane.n, p) + plane.d;
     // Classify p based on the signed distance
-    if (dist > VEC_EPSILON)
+    if (dist > BIG_EPSILON)
         return POINT_IN_FRONT_OF_PLANE;
-    if (dist < -VEC_EPSILON)
+    if (dist < -BIG_EPSILON)
         return POINT_BEHIND_PLANE;
     return POINT_ON_PLANE;
 }
@@ -355,7 +389,7 @@ Plane PickSplittingPlane(std::vector<Poly *> &polygons)
 void SplitPolygon(Poly *poly, Plane plane, Poly **frontPoly, Poly **backPoly)
 {
     int numFront = 0, numBack = 0;
-    Vec3 frontVerts[100], backVerts[100];
+    Vec3 frontVerts[256], backVerts[256];
     // Test all edges (a, b) starting with edge from last to first vertex
     int numVerts = poly->numberOfVertices;
     Vec3 a = poly->verts[numVerts - 1].position;
@@ -383,17 +417,17 @@ void SplitPolygon(Poly *poly, Plane plane, Poly **frontPoly, Poly **backPoly)
         {
             if (aSide == POINT_IN_FRONT_OF_PLANE)
             {
-            // Edge (a, b) straddles plane, output intersection point
-            Vec3 i; // IntersectEdgeAgainstPlane(a, b, plane);
-            f32 t = -1.0f;
-            PlaneGetIntersection(plane, a, b, i, t);
-            ASSERT(ClassifyPointToPlane(i, plane) == POINT_ON_PLANE);
-            frontVerts[numFront++] = backVerts[numBack++] = i;
+                // Edge (a, b) straddles plane, output intersection point
+                Vec3 i; // IntersectEdgeAgainstPlane(a, b, plane);
+                f32 t = -1.0f;
+                PlaneGetIntersection(plane, a, b, i, t);
+                ASSERT(ClassifyPointToPlane(i, plane) == POINT_ON_PLANE);
+                frontVerts[numFront++] = backVerts[numBack++] = i;
             }
             else if (aSide == POINT_ON_PLANE)
             {
-            // Output a when edge (a, b) goes from ‘on’ to ‘behind’ plane
-            backVerts[numBack++] = a;
+                // Output a when edge (a, b) goes from ‘on’ to ‘behind’ plane
+                backVerts[numBack++] = a;
             }
             // In all three cases, output b to the back side
             backVerts[numBack++] = b;
@@ -417,16 +451,17 @@ void SplitPolygon(Poly *poly, Plane plane, Poly **frontPoly, Poly **backPoly)
     {
         Vertex vertex;
         vertex.position = frontVerts[i];
-        vertex.color = {1, 0, 0, 1};
+        vertex.color = {0, 0, 0, 1};
         (*frontPoly)->AddVertex(vertex);
     }
     for(i32 i = 0; i < numBack; i++)
     {
         Vertex vertex;
         vertex.position = backVerts[i];
-        vertex.color = {1, 0, 0, 1};
+        vertex.color = {0, 0, 0, 1};
         (*backPoly)->AddVertex(vertex);
     }
+
     (*frontPoly)->CalculatePlane();
     (*backPoly)->CalculatePlane();
 }
@@ -434,7 +469,8 @@ void SplitPolygon(Poly *poly, Plane plane, Poly **frontPoly, Poly **backPoly)
 BSPNode *BuildBSPTree(std::vector<Poly *> &polygons, BSPState state)
 {
     // Return null is there are no polys
-    //if(polygons.empty()) return 0;
+    //if(polygons.size() == 2)
+    //    i32 StopHere = 0;
 
     i32 numPolygons = polygons.size();
     
@@ -452,16 +488,17 @@ BSPNode *BuildBSPTree(std::vector<Poly *> &polygons, BSPState state)
         }
     }
     // Select best possible partitioning plane base on the input geometry
-    Plane splitPlane = PickSplittingPlane(polygons);
+    Plane splitPlane = polygons[0]->plane;// PickSplittingPlane(polygons);
 
     std::vector<Poly *> frontList, backList;
 
     // Test each polygon against the divding plane, adding them to the front list, back list, or both
     // as appropiate
-    for(i32 i = 0; i < numPolygons; i++)
+    for(i32 i = 1; i < numPolygons; i++)
     {
         Poly *poly = polygons[i], *frontPart, *backPart;
-        switch(ClassifyPolygonToPlane(poly, splitPlane))
+        ClassifyPolygon result = (ClassifyPolygon)ClassifyPolygonToPlane(poly, splitPlane);
+        switch(result)
         {
             case POLYGON_COPLANAR_WITH_PLANE:
                 // What’s done in this case depends on what type of tree is being
@@ -470,7 +507,6 @@ BSPNode *BuildBSPTree(std::vector<Poly *> &polygons, BSPState state)
                 // with the plane). Here, for a leaf-storing tree, coplanar polygons
                 // are sent to either side of the plane. In this case, to the front
                 // side, by falling through to the next case
-                break;
             case POLYGON_IN_FRONT_OF_PLANE:
                 frontList.push_back(poly);
                 break;
@@ -481,7 +517,7 @@ BSPNode *BuildBSPTree(std::vector<Poly *> &polygons, BSPState state)
                 // Split polygon to plane and send a part to each side of the plane
                 SplitPolygon(poly, splitPlane, &frontPart, &backPart);
                 frontList.push_back(frontPart);
-                frontList.push_back(backPart);
+                backList.push_back(backPart);
                 break;
         }
     }
@@ -492,23 +528,53 @@ BSPNode *BuildBSPTree(std::vector<Poly *> &polygons, BSPState state)
     return new BSPNode(frontTree, backTree, splitPlane);
 }
 
+int PointInSolidSpace(BSPNode *node, Vec3 p)
+{
+    if(node == 0) return POINT_IN_FRONT_OF_PLANE;
+    while (!node->IsLeaf())
+    {
+        // Compute distance of point to dividing plane
+        f32 dist = Vec3Dot(node->plane.n, p) + node->plane.d;
+        if (dist > EPSILON)
+        {
+            // Point in front of plane, so traverse front of tree
+            node = node->child[1];
+        }
+        else if (dist < -EPSILON)
+        {
+            // Point behind of plane, so traverse back of tree
+            node = node->child[0];
+        }
+        else
+        {
+            // Point on dividing plane; must traverse both sides
+            int front = PointInSolidSpace(node->child[0], p);
+            int back = PointInSolidSpace(node->child[1], p);
+            // If results agree, return that, else point is on boundary
+            return (front == back) ? front : POINT_ON_PLANE;
+        }
+    }
+    // Now at a leaf, inside/outside status determined by solid flag
+    return node->IsSolid() ? POINT_BEHIND_PLANE : POINT_IN_FRONT_OF_PLANE;
+}
+
 int RayIntersect(BSPNode *node, Vec3 p, Vec3 d, f32 tmin, f32 tmax, f32 *thit)
 {
     std::stack<BSPNode *> nodeStack;
-    std::stack<float> timeStack;
+    std::stack<f32> timeStack;
     ASSERT(node != NULL);
     while (1) 
     {
         if (!node->IsLeaf())
         {
-            float denom = Vec3Dot(node->plane.n, d);
-            float dist = node->plane.d - Vec3Dot(node->plane.n, p);
+            f32 denom = Vec3Dot(node->plane.n, d);
+            f32 dist = Vec3Dot(node->plane.n, p) + node->plane.d;
             int nearIndex = dist > 0.0f;
             // If denom is zero, ray runs parallel to plane. In this case,
             // just fall through to visit the near side (the one p lies on)
             if (denom != 0.0f) 
             {
-                float t = dist / denom;
+                f32 t = dist / denom;
                 if (0.0f <= t && t <= tmax) 
                 {
                     if (t >= tmin)
@@ -568,16 +634,6 @@ i32 main(void)
     renderer.deviceContext->VSSetShader(shader.vertex, 0, 0);
     renderer.deviceContext->PSSetShader(shader.fragment, 0, 0);
 
-    // create the const buffer data to be pass to the gpu
-    Vec3 pos = {0, 1.2, -1.5};
-    Vec3 tar = {0, 1,  0};
-    Vec3 up  = {0, 1,  0};
-    CBuffer cbuffer = {};
-    cbuffer.view = Mat4LookAt(pos, tar, up);
-    cbuffer.proj = Mat4Perspective(60, (f32)WINDOW_WIDTH/(f32)WINDOW_HEIGHT, 0.01f, 100.0f);
-    cbuffer.wolrd = Mat4Identity();
-    Win32ConstBuffer constBuffer = Win32LoadConstBuffer(&renderer, (void *)&cbuffer, sizeof(cbuffer), 0);
-
     // create input layout. 
     ID3D11InputLayout *layout = 0;
     D3D11_INPUT_ELEMENT_DESC inputLayoutDesc[] =
@@ -597,7 +653,9 @@ i32 main(void)
         &layout);
 
     // TODO: try to parse the valve's .map file
+    //Win32File mapFile = Win32ReadFile("../src/error.map", &resourcesArena);
     Win32File mapFile = Win32ReadFile("../src/test.map", &resourcesArena);
+    //Win32File mapFile = Win32ReadFile("../src/test2.map", &resourcesArena);
     ParseMapFile(&mapFile, gameState);
 
     Map *map = &gameState->map;
@@ -610,12 +668,39 @@ i32 main(void)
         brushes->AddBrush(GetIBrush(brush));
     }
 
+    
+/*
+    for(i32 i = 1; i < 14; i++)
+    {
+        if(i == 13)
+        {
+            i++;
+        }
+        brush = &map->entities[0].brushes[i];
+        brushes->AddBrush(GetIBrush(brush));
+    }
+*/
+
     Poly *polygons = brushes->MergeList();
 
+    i32 polysCount = polygons->GetNumberOfPolysInList();
     // Triangulize the poygons
-    std::vector<Vertex> vertices;
+    
+    // TODO: try to build the bsp tree
+    std::vector<Poly *> pPolygons;
     for(Poly *polygon = polygons; polygon; polygon = polygon->next)
     {
+        polygon->CalculatePlane();
+        pPolygons.push_back(polygon);
+    }
+    
+    
+    std::vector<Vertex> vertices;
+
+    for(i32 j = 0; j < pPolygons.size(); ++j)
+    {
+        Poly *polygon = pPolygons[j];
+        ASSERT(polygon->numberOfVertices >= 3);
         for(i32 i = 0; i < polygon->numberOfVertices - 2; ++i)
         {
             Vertex a = polygon->verts[0];
@@ -627,17 +712,26 @@ i32 main(void)
         }
     }
 
-    // TODO: try to build the bsp tree
-    std::vector<Poly *> pPolygons;
-    for(Poly *polygon = polygons; polygon; polygon = polygon->next)
-    {
-        pPolygons.push_back(polygon);
-    }
+
 
     BSPNode *bspRoot = BuildBSPTree(pPolygons, BSP_ROOT);
 
     i32 verticesCount = vertices.size();
     Win32VertexBuffer vertexBuffer = Win32LoadVertexBuffer(&renderer, vertices.data(), vertices.size(), layout);
+
+    f32 rotationY = 0.0f;
+    Vec3 playerP = {0, 1.2, -1.8};
+    Vec3 playerV = {0, 0, 0};
+    Vec3 playerA = {0, -1, 0};
+
+    // create the const buffer data to be pass to the gpu
+    Vec3 dir = {0, 0,  1};
+    Vec3 up  = {0, 1,  0};
+    CBuffer cbuffer = {};
+    cbuffer.view = Mat4LookAt(playerP, playerP + dir, up);
+    cbuffer.proj = Mat4Perspective(60, (f32)WINDOW_WIDTH/(f32)WINDOW_HEIGHT, 0.01f, 100.0f);
+    cbuffer.wolrd = Mat4Identity();
+    Win32ConstBuffer constBuffer = Win32LoadConstBuffer(&renderer, (void *)&cbuffer, sizeof(cbuffer), 0);
 
 
     ShowWindow(window, 1);
@@ -646,13 +740,66 @@ i32 main(void)
     {
         Win32FlushEvents(window);
 
-        static f32 angle = 0;
-        Mat4 rotY = Mat4RotateY(angle);
-        cbuffer.wolrd = rotY;
-        angle += 0.016f;
+        rotationY = 0;
+        if(KeyPress(VK_LEFT))
+        {
+            rotationY = 0.016;
+        }
+        if(KeyPress(VK_RIGHT))
+        {
+            rotationY = -0.016;
+        }
+        dir = Mat4TransformVector(Mat4RotateY(rotationY), dir);
+        Vec3 right = Vec3Normalized(Vec3Cross(dir, up));
+
+        Vec3 newPlayerP = playerP;
+        if(KeyPress('A'))
+        {
+            newPlayerP = newPlayerP + right * 0.016;
+        }
+        if(KeyPress('D'))
+        {
+            newPlayerP = newPlayerP - right * 0.016; 
+        }
+        if(KeyPress('W'))
+        {
+            newPlayerP = newPlayerP + dir * 0.016;
+        }
+        if(KeyPress('S'))
+        {
+            newPlayerP = newPlayerP - dir * 0.016;
+        }
+        if(KeyPress('R'))
+        {
+            newPlayerP.y += 0.016;
+        }
+        if(KeyPress('F'))
+        {
+            newPlayerP.y -= 0.016;
+        }
+
+        //playerP = newPlayerP;
+       
+        char *options[] =
+        {
+            "POINT_IN_FRONT_OF_PLANE",
+            "POINT_BEHIND_PLANE",
+            "POINT_ON_PLANE"
+        };
+
+        i32 result = PointInSolidSpace(bspRoot, newPlayerP);
+        
+        printf("Point: %s\n", options[result]);
+
+        if(result == POINT_IN_FRONT_OF_PLANE)
+        {
+            playerP = newPlayerP;
+        }
+        
+        cbuffer.view = Mat4LookAt(playerP, playerP + dir, up);
         Win32UpdateConstBuffer(&renderer, &constBuffer, (void *)&cbuffer);
 
-        f32 clearColor[] = { 0.2, 0.2, 0.2, 1 };
+        float clearColor[] = { 0.2, 0.2, 0.2, 1 };
         renderer.deviceContext->ClearRenderTargetView(
                 renderer.renderTargetView, clearColor);
 
@@ -667,8 +814,9 @@ i32 main(void)
         renderer.deviceContext->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
         renderer.deviceContext->Draw(vertexBuffer.verticesCount, 0);
 
-
         renderer.swapChain->Present(1, 0);
+
+        gLastInput = gCurrentInput;
 
     }
 
@@ -685,130 +833,3 @@ i32 main(void)
 
     return 0;
 }
-
-#if 0
-CSGBrush GetCSGBrush(Brush *brush, Arena *arena)
-{
-    Face *faces = brush->faces;
-    u32 facesCount = brush->facesCount;
-
-    // TODO: change the vector to darrays using memory arenas
-    std::vector<PolygonData> polygons;
-    polygons.resize(facesCount);
-    i32 polygonsCount = facesCount;
-    for(i32 i = 0; i < facesCount-2; ++i) {
-        for(i32 j = i;j < facesCount-1; ++j) {
-            for(i32 k = j; k < facesCount; ++k) {
-
-                if(i != j && i != k && j != k)
-                {
-                    Plane a = GetPlaneFromThreePoints(faces[i].a, faces[i].b, faces[i].c); 
-                    Plane b = GetPlaneFromThreePoints(faces[j].a, faces[j].b, faces[j].c); 
-                    Plane c = GetPlaneFromThreePoints(faces[k].a, faces[k].b, faces[k].c); 
-                    Vertex vertex = {};
-                    if(GetIntersection(a.n, b.n, c.n, a.d, b.d, c.d, &vertex))
-                    {
-                        bool illegal = false;
-                        for(i32 m = 0; m < facesCount; ++m)
-                        {
-                            Plane plane = GetPlaneFromThreePoints(faces[m].a, faces[m].b, faces[m].c); 
-                            f32 dot = Vec3Dot(plane.n, vertex.position);
-                            f32 d = plane.d;
-                            if((dot + d) > VEC_EPSILON)
-                            {
-                                illegal = true;
-                            }
-                        }
-                        if(illegal == false)
-                        {
-                            // TODO: see where this should be performed
-                            Mat4 scale = Mat4Scale(1.0f/128.0f, 1.0f/128.0f, 1.0f/128.0f);
-                            vertex.position = Mat4TransformPoint(scale, vertex.position);
-                            polygons[i].vertices.push_back(vertex);
-                            polygons[j].vertices.push_back(vertex);
-                            polygons[k].vertices.push_back(vertex);
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    // TODO: get texture coords
-    
-    // order the vertices in the polygons
-    for(i32 p = 0; p < polygonsCount; ++p)
-    {
-        Plane polygonPlane = GetPlaneFromThreePoints(faces[p].a, faces[p].b, faces[p].c); 
-        PolygonData *polygon = polygons.data() + p;
-        Vec3 center = GetCenterOfPolygon(polygon);
-        
-        for(i32 n = 0; n <= polygon->vertices.size() - 3; ++n)
-        {
-            Vec3 a = Vec3Normalized(polygon->vertices[n].position - center);
-            Plane p = GetPlaneFromThreePoints(polygon->vertices[n].position,
-                                              center, center + polygonPlane.n);
-
-            f32 smallestAngle = -1;
-            i32 smallest = -1;
-
-            for(i32 m = n + 1; m <= polygon->vertices.size() - 1; ++m)
-            {
-                Vertex vertex = polygon->vertices[m];
-                if((Vec3Dot(p.n, vertex.position) + p.d) > 0.0f)
-                {
-                    Vec3 b = Vec3Normalized(vertex.position - center);
-                    f32 angle = Vec3Dot(a, b);
-                    if(angle > smallestAngle)
-                    {
-                        smallestAngle = angle;
-                        smallest = m;
-                    }
-                }
-            }
-
-            if(smallest >= 0)
-            {
-                Vertex tmp = polygon->vertices[n + 1];
-                polygon->vertices[n + 1] = polygon->vertices[smallest];
-                polygon->vertices[smallest] = tmp;
-            }
-        } 
-    }
-
-    // calculate the polygons planes
-    for(i32 p = 0; p < polygonsCount; ++p)
-    {
-        PolygonData *polygon = polygons.data() + p;
-        polygon->plane = GetPlaneFromThreePoints(faces[p].a, faces[p].b, faces[p].c); 
-    }
-
-    CSGBrush csgBrush;
-    csgBrush.polygons = polygons;
-    return csgBrush;
-
-    // TODO: Reverse vertices that are in inver order for back face culling
-#if 0
-    for(i32 p = 0; p < polygonsCount; ++p)
-    {
-        Plane facePlane = GetPlaneFromThreePoints(faces[p].a, faces[p].b, faces[p].c); 
-        PolygonData *polygon = polygons + p;
-        Vec3 a = polygon->vertices[0].position;
-        Vec3 b = polygon->vertices[1].position;
-        Vec3 c = polygon->vertices[2].position;
-        
-        Vec3 ab = Vec3Normalized(b - a);
-        Vec3 ac = Vec3Normalized(c - a);
-        Vec3 n = Vec3Cross(ab, ac);
-        if(Vec3Dot(n, facePlane.n) < VEC_EPSILON)
-        {
-            std::vector<Vertex> tmpVertices = polygon->vertices;
-            for(i32 i = 0; i > tmpVertices.size(); ++i)
-            {
-                polygon->vertices[i] = tmpVertices[(tmpVertices.size()-1)-i];
-            }
-        }
-    }
-#endif
-}
-#endif

@@ -1,0 +1,12 @@
+{
+"classname" "worldspawn"
+"mapversion" "220"
+"wad" "\programs\steam\steamapps\common\half-life\valve\halflife.wad;\programs\steam\steamapps\common\half-life\valve\decals.wad;\programs\steam\steamapps\common\half-life\valve\liquids.wad;\programs\steam\steamapps\common\half-life\valve\xeno.wad"
+{
+( 64 -448 192 ) ( 64 -256 192 ) ( 256 -256 192 ) AAATRIGGER [ 1 0 0 0 ] [ 0 -1 0 0 ] 0 1 1 
+( 64 -448 0 ) ( 64 -256 0 ) ( 64 -256 192 ) AAATRIGGER [ 0 1 0 0 ] [ 0 0 -1 0 ] 0 1 1 
+( 64 -256 0 ) ( 256 -256 192 ) ( 64 -256 192 ) AAATRIGGER [ 1 0 0 0 ] [ 0 0 -1 0 ] 0 1 1 
+( 64 -448 0 ) ( 64 -448 192 ) ( 256 -448 192 ) AAATRIGGER [ 1 0 0 0 ] [ 0 0 -1 0 ] 0 1 1 
+( 64 -256 0 ) ( 64 -448 0 ) ( 256 -448 192 ) AAATRIGGER [ 0 1 0 0 ] [ 0 0 -1 0 ] 0 1 1 
+}
+}

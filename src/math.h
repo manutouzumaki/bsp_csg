@@ -4,7 +4,10 @@
 #include <math.h>
 
 #define MAT_EPSILON 0.000001f
-#define VEC_EPSILON 1e-6f
+#define     EPSILON 0.0001f
+#define VEC_EPSILON 0.0001f
+#define SMALL_EPSILON 1e-5
+#define BIG_EPSILON 0.0001f
 //#define VEC_EPSILON 0.000001f
 #define PI 3.14159265359
 #define TO_RAD(value) ((value/180.0f) * PI)

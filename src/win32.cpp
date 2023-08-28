@@ -215,6 +215,7 @@ static Win32Renderer Win32InitD3D11(HWND window, i32 width, i32 height)
     renderer.deviceContext->OMSetRenderTargets(1, &renderer.renderTargetView, renderer.depthStencilView);
     renderer.deviceContext->OMSetDepthStencilState(renderer.depthStencilOn, 1);
     renderer.deviceContext->OMSetBlendState(renderer.alphaBlendEnable, 0, 0xffffffff);
+    //renderer.deviceContext->RSSetState(renderer.wireFrameRasterizer);
     renderer.deviceContext->RSSetState(renderer.fillRasterizerCullBack);
 
     return renderer;
@@ -243,9 +244,64 @@ static void Win32FlushEvents(HWND window)
     MSG msg;
     while(PeekMessageA(&msg, window, 0, 0, PM_REMOVE) != 0)
     {
-        TranslateMessage(&msg);
-        DispatchMessage(&msg);
+        switch(msg.message)
+        {
+            case WM_KEYDOWN:
+            case WM_SYSKEYDOWN:
+            case WM_KEYUP:
+            case WM_SYSKEYUP:
+            {
+                bool wasPress = ((msg.lParam & (1 << 30)) != 0);
+                bool isPress  = ((msg.lParam & (1 << 31)) == 0);
+                if(isPress != wasPress)
+                {
+                    DWORD vkCode = (DWORD)msg.wParam;
+                    gCurrentInput.keys[vkCode].isPress = isPress;
+                }
+            } break;
+            case WM_LBUTTONDOWN:
+            case WM_LBUTTONUP:
+            case WM_RBUTTONDOWN:
+            case WM_RBUTTONUP:
+            case WM_MBUTTONDOWN:
+            case WM_MBUTTONUP:
+            {
+                gCurrentInput.mouseButtons[0].isPress = ((msg.wParam & MK_LBUTTON) != 0); 
+                gCurrentInput.mouseButtons[1].isPress = ((msg.wParam & MK_MBUTTON) != 0); 
+                gCurrentInput.mouseButtons[2].isPress = ((msg.wParam & MK_RBUTTON) != 0); 
+            } break;
+            case WM_MOUSEMOVE:
+            {
+                gCurrentInput.mouseX = (i32)GET_X_LPARAM(msg.lParam);
+                gCurrentInput.mouseY = (i32)GET_Y_LPARAM(msg.lParam);
+            } break;
+
+            default:
+            {
+                TranslateMessage(&msg);
+                DispatchMessage(&msg);
+            } break;
+        }
     }
+
+    for(i32 i = 0; i < ARRAY_LENGTH(gCurrentInput.keys); ++i)
+    {
+        gCurrentInput.keys[i].wasPress = false;
+        if(gLastInput.keys[i].isPress == true)
+        {
+            gCurrentInput.keys[i].wasPress = true;
+        }
+    }
+
+    for(i32 i = 0; i < ARRAY_LENGTH(gCurrentInput.mouseButtons); ++i)
+    {
+        gCurrentInput.mouseButtons[i].wasPress = false;
+        if(gLastInput.mouseButtons[i].isPress == true)
+        {
+            gCurrentInput.mouseButtons[i].wasPress = true;
+        }
+    }
+
 }
 
 static Win32File Win32ReadFile(char *filepath, Arena *arena)
@@ -266,7 +322,7 @@ static Win32File Win32ReadFile(char *filepath, Arena *arena)
     LARGE_INTEGER bytesToRead;
     GetFileSizeEx(hFile, &bytesToRead);
 
-    void *data = ArenaPush(arena, bytesToRead.QuadPart);
+    void *data = ArenaPush(arena, bytesToRead.QuadPart + 1);
 
     size_t bytesReaded = 0;
     if(!ReadFile(hFile, data, bytesToRead.QuadPart, (LPDWORD)&bytesReaded, 0))
@@ -274,6 +330,9 @@ static Win32File Win32ReadFile(char *filepath, Arena *arena)
         printf("Error reading file: %s\n", filepath);
         ASSERT(!"INVALID_CODE_PATH");
     }
+
+    char *end = ((char *)data) + bytesToRead.QuadPart;
+    end[0] = '\0';
 
     CloseHandle(hFile);
 

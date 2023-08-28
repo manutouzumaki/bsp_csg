@@ -1,11 +1,11 @@
 PolygonPlane ClassifyPoint(const Plane &plane, const Vec3 &v)
 {
     f32 distance = Vec3Dot(plane.n, v) + plane.d;
-    if(distance > VEC_EPSILON)
+    if(distance > SMALL_EPSILON)
     {
         return FRONT;
     }
-    else if(distance < -VEC_EPSILON)
+    else if(distance < -SMALL_EPSILON)
     {
         return BACK;
     }
@@ -49,7 +49,7 @@ i32 Poly::GetNumberOfPolysInList() const
 
 void Poly::SplitPoly(Poly *pPoly_, Poly **ppFront, Poly **ppBack)
 {
-    PolygonPlane *pCP = new PolygonPlane[numberOfVertices];
+    PolygonPlane *pCP = new PolygonPlane[pPoly_->numberOfVertices];
 
     // Classify all point
     for(i32 i = 0; i < pPoly_->numberOfVertices; i++)
@@ -64,7 +64,7 @@ void Poly::SplitPoly(Poly *pPoly_, Poly **ppFront, Poly **ppBack)
     pFront->plane = pPoly_->plane;
     pBack->plane  = pPoly_->plane;
 
-    for(i32 i = 0; i < numberOfVertices; i++)
+    for(i32 i = 0; i < pPoly_->numberOfVertices; i++)
     {
         // Add point to appropriate list
         switch(pCP[i])
@@ -121,6 +121,10 @@ void Poly::SplitPoly(Poly *pPoly_, Poly **ppFront, Poly **ppBack)
     }
 
     delete [] pCP;
+
+    ASSERT(pFront->numberOfVertices >= 3);
+    ASSERT(pBack->numberOfVertices >= 3);
+
     pFront->CalculatePlane();
     pBack->CalculatePlane();
     *ppFront = pFront;
@@ -135,7 +139,7 @@ PolygonPlane Poly::ClassifyPoly(Poly *poly)
     for(i32 i = 0; i < (i32)poly->numberOfVertices; i++)
     {
         dist = Vec3Dot(plane.n, poly->verts[i].position) + plane.d;
-		if ( dist > 0.001 )
+		if ( dist > EPSILON )
 		{
 			if ( bBack )
 			{
@@ -144,7 +148,7 @@ PolygonPlane Poly::ClassifyPoly(Poly *poly)
 
 			bFront = true;
 		}
-		else if ( dist < -0.001 )
+		else if ( dist < -EPSILON )
 		{
 			if ( bFront )
 			{
@@ -314,6 +318,7 @@ bool Poly::CalculatePlane()
     if ( numberOfVertices < 3 )
 	{
 		printf("Polygon has less than 3 vertices!\n");
+        ASSERT(!"INVALID_CODE_PATH");
 		return false;
 	}
 
@@ -342,22 +347,26 @@ bool Poly::CalculatePlane()
         centerOfMass.z += verts[ i ].position.z;
     }
 
-    if ( ( fabs ( plane.n.x ) < VEC_EPSILON ) && ( fabs ( plane.n.y ) < VEC_EPSILON ) &&
-		 ( fabs ( plane.n.z ) < VEC_EPSILON ) )
+    if ( ( fabs ( plane.n.x ) < SMALL_EPSILON ) && ( fabs ( plane.n.y ) < SMALL_EPSILON ) &&
+		 ( fabs ( plane.n.z ) < SMALL_EPSILON ) )
     {
+        ASSERT(!"INVALID_CODE_PATH");
         return false;
     }
 
     magnitude = sqrt ( plane.n.x * plane.n.x + plane.n.y * plane.n.y + plane.n.z * plane.n.z );
 
-    if ( magnitude < VEC_EPSILON )
+    if ( magnitude < SMALL_EPSILON )
 	{
+        ASSERT(!"INVALID_CODE_PATH");
 		return false;
 	}
 
     plane.n.x /= magnitude;
     plane.n.y /= magnitude;
     plane.n.z /= magnitude;
+
+    plane.n = Vec3Normalized(plane.n);
 
     centerOfMass.x /= (f32)numberOfVertices;
     centerOfMass.y /= (f32)numberOfVertices;
