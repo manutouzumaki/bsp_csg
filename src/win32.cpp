@@ -216,7 +216,7 @@ static Win32Renderer Win32InitD3D11(HWND window, i32 width, i32 height)
     renderer.deviceContext->OMSetDepthStencilState(renderer.depthStencilOn, 1);
     renderer.deviceContext->OMSetBlendState(renderer.alphaBlendEnable, 0, 0xffffffff);
     //renderer.deviceContext->RSSetState(renderer.wireFrameRasterizer);
-    renderer.deviceContext->RSSetState(renderer.fillRasterizerCullBack);
+    renderer.deviceContext->RSSetState(renderer.fillRasterizerCullNone);
 
     return renderer;
 }

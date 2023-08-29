@@ -27,6 +27,50 @@ static InputState gLastInput;
 #include "win32.cpp"
 #include "input.cpp"
 
+Vertex cubeVertices[] = {
+    -0.5f, -0.5f, -0.5f, 0, 1, 0, 1, 0.0f, 0.0f,
+     0.5f, -0.5f, -0.5f, 0, 1, 0, 1, 1.0f, 0.0f,
+     0.5f,  0.5f, -0.5f, 0, 1, 0, 1, 1.0f, 1.0f,
+     0.5f,  0.5f, -0.5f, 0, 1, 0, 1, 1.0f, 1.0f,
+    -0.5f,  0.5f, -0.5f, 0, 1, 0, 1, 0.0f, 1.0f,
+    -0.5f, -0.5f, -0.5f, 0, 1, 0, 1, 0.0f, 0.0f,
+
+    -0.5f, -0.5f,  0.5f, 0, 1, 0, 1, 0.0f, 0.0f,
+     0.5f, -0.5f,  0.5f, 0, 1, 0, 1, 1.0f, 0.0f,
+     0.5f,  0.5f,  0.5f, 0, 1, 0, 1, 1.0f, 1.0f,
+     0.5f,  0.5f,  0.5f, 0, 1, 0, 1, 1.0f, 1.0f,
+    -0.5f,  0.5f,  0.5f, 0, 1, 0, 1, 0.0f, 1.0f,
+    -0.5f, -0.5f,  0.5f, 0, 1, 0, 1, 0.0f, 0.0f,
+
+    -0.5f,  0.5f,  0.5f, 0, 1, 0, 1, 1.0f, 0.0f,
+    -0.5f,  0.5f, -0.5f, 0, 1, 0, 1, 1.0f, 1.0f,
+    -0.5f, -0.5f, -0.5f, 0, 1, 0, 1, 0.0f, 1.0f,
+    -0.5f, -0.5f, -0.5f, 0, 1, 0, 1, 0.0f, 1.0f,
+    -0.5f, -0.5f,  0.5f, 0, 1, 0, 1, 0.0f, 0.0f,
+    -0.5f,  0.5f,  0.5f, 0, 1, 0, 1, 1.0f, 0.0f,
+
+     0.5f,  0.5f,  0.5f, 0, 1, 0, 1, 1.0f, 0.0f,
+     0.5f,  0.5f, -0.5f, 0, 1, 0, 1, 1.0f, 1.0f,
+     0.5f, -0.5f, -0.5f, 0, 1, 0, 1, 0.0f, 1.0f,
+     0.5f, -0.5f, -0.5f, 0, 1, 0, 1, 0.0f, 1.0f,
+     0.5f, -0.5f,  0.5f, 0, 1, 0, 1, 0.0f, 0.0f,
+     0.5f,  0.5f,  0.5f, 0, 1, 0, 1, 1.0f, 0.0f,
+
+    -0.5f, -0.5f, -0.5f, 0, 1, 0, 1, 0.0f, 1.0f,
+     0.5f, -0.5f, -0.5f, 0, 1, 0, 1, 1.0f, 1.0f,
+     0.5f, -0.5f,  0.5f, 0, 1, 0, 1, 1.0f, 0.0f,
+     0.5f, -0.5f,  0.5f, 0, 1, 0, 1, 1.0f, 0.0f,
+    -0.5f, -0.5f,  0.5f, 0, 1, 0, 1, 0.0f, 0.0f,
+    -0.5f, -0.5f, -0.5f, 0, 1, 0, 1, 0.0f, 1.0f,
+
+    -0.5f,  0.5f, -0.5f, 0, 1, 0, 1, 0.0f, 1.0f,
+     0.5f,  0.5f, -0.5f, 0, 1, 0, 1, 1.0f, 1.0f,
+     0.5f,  0.5f,  0.5f, 0, 1, 0, 1, 1.0f, 0.0f,
+     0.5f,  0.5f,  0.5f, 0, 1, 0, 1, 1.0f, 0.0f,
+    -0.5f,  0.5f,  0.5f, 0, 1, 0, 1, 0.0f, 0.0f,
+    -0.5f,  0.5f, -0.5f, 0, 1, 0, 1, 0.0f, 1.0f
+};
+
 static void ParseFace(char **current, Face *face, char *end)
 {
     // TODO: interchange y and z values
@@ -340,7 +384,7 @@ int ClassifyPolygonToPlane(Poly *poly, Plane plane)
     return POLYGON_COPLANAR_WITH_PLANE;
 }
 
-Plane PickSplittingPlane(std::vector<Poly *> &polygons)
+Plane PickSplittingPlane(std::vector<Poly *> &polygons, i32 &outIndex)
 {
     // Blend factor for optimizing for balance or split (should be tweaked)
     const f32 K = 0.8f;
@@ -381,6 +425,7 @@ Plane PickSplittingPlane(std::vector<Poly *> &polygons)
         {
             bestScore = score;
             bestPlane = plane;
+            outIndex = i;
         }
     }
     return bestPlane;
@@ -468,10 +513,6 @@ void SplitPolygon(Poly *poly, Plane plane, Poly **frontPoly, Poly **backPoly)
 
 BSPNode *BuildBSPTree(std::vector<Poly *> &polygons, BSPState state)
 {
-    // Return null is there are no polys
-    //if(polygons.size() == 2)
-    //    i32 StopHere = 0;
-
     i32 numPolygons = polygons.size();
     
     // If criterion for a leaf is matche, create a leaf node from remaining polygons
@@ -488,25 +529,27 @@ BSPNode *BuildBSPTree(std::vector<Poly *> &polygons, BSPState state)
         }
     }
     // Select best possible partitioning plane base on the input geometry
-    Plane splitPlane = polygons[0]->plane;// PickSplittingPlane(polygons);
+
+    i32 index = -1;
+    Plane splitPlane = PickSplittingPlane(polygons, index);
+
+    //i32 index = 0;
+    //Plane splitPlane = polygons[0]->plane;
 
     std::vector<Poly *> frontList, backList;
 
     // Test each polygon against the divding plane, adding them to the front list, back list, or both
     // as appropiate
-    for(i32 i = 1; i < numPolygons; i++)
+    for(i32 i = 0; i < numPolygons; i++)
     {
+        // dont check with it self
+        if(i == index) continue;
+
         Poly *poly = polygons[i], *frontPart, *backPart;
         ClassifyPolygon result = (ClassifyPolygon)ClassifyPolygonToPlane(poly, splitPlane);
         switch(result)
         {
             case POLYGON_COPLANAR_WITH_PLANE:
-                // What’s done in this case depends on what type of tree is being
-                // built. For a node-storing tree, the polygon is stored inside
-                // the node at this level (along with all other polygons coplanar
-                // with the plane). Here, for a leaf-storing tree, coplanar polygons
-                // are sent to either side of the plane. In this case, to the front
-                // side, by falling through to the next case
             case POLYGON_IN_FRONT_OF_PLANE:
                 frontList.push_back(poly);
                 break;
@@ -531,83 +574,91 @@ BSPNode *BuildBSPTree(std::vector<Poly *> &polygons, BSPState state)
 int PointInSolidSpace(BSPNode *node, Vec3 p)
 {
     if(node == 0) return POINT_IN_FRONT_OF_PLANE;
-    while (!node->IsLeaf())
+
+    while(!node->IsLeaf())
     {
-        // Compute distance of point to dividing plane
         f32 dist = Vec3Dot(node->plane.n, p) + node->plane.d;
-        if (dist > EPSILON)
-        {
-            // Point in front of plane, so traverse front of tree
-            node = node->child[1];
-        }
-        else if (dist < -EPSILON)
-        {
-            // Point behind of plane, so traverse back of tree
-            node = node->child[0];
-        }
-        else
-        {
-            // Point on dividing plane; must traverse both sides
-            int front = PointInSolidSpace(node->child[0], p);
-            int back = PointInSolidSpace(node->child[1], p);
-            // If results agree, return that, else point is on boundary
-            return (front == back) ? front : POINT_ON_PLANE;
-        }
+        node = node->child[dist < EPSILON];
     }
     // Now at a leaf, inside/outside status determined by solid flag
     return node->IsSolid() ? POINT_BEHIND_PLANE : POINT_IN_FRONT_OF_PLANE;
 }
 
-int RayIntersect(BSPNode *node, Vec3 p, Vec3 d, f32 tmin, f32 tmax, f32 *thit)
+int IntersectionLinePlane(Vec3 a, Vec3 b, Plane p, f32 &t, Vec3 &q)
 {
-    std::stack<BSPNode *> nodeStack;
-    std::stack<f32> timeStack;
-    ASSERT(node != NULL);
-    while (1) 
+    Vec3 ab = b - a;
+    t = (-p.d - Vec3Dot(p.n, a)) / Vec3Dot(p.n, ab);
+    if(t >= 0.0f && t <= 1.0f)
     {
-        if (!node->IsLeaf())
+        q = a + ab * t;
+        return 1;
+    }
+    return 0;
+}
+
+int RayIntersect(BSPNode *node, Vec3 a, Vec3 b, f32 *thit, Plane *outplane)
+{
+    if(node->IsLeaf())
+    {
+        if(node->IsSolid())
         {
-            f32 denom = Vec3Dot(node->plane.n, d);
-            f32 dist = Vec3Dot(node->plane.n, p) + node->plane.d;
-            int nearIndex = dist > 0.0f;
-            // If denom is zero, ray runs parallel to plane. In this case,
-            // just fall through to visit the near side (the one p lies on)
-            if (denom != 0.0f) 
-            {
-                f32 t = dist / denom;
-                if (0.0f <= t && t <= tmax) 
-                {
-                    if (t >= tmin)
-                    {
-                        // Straddling, push far side onto stack, then visit near side
-                        nodeStack.push(node->child[1 ^ nearIndex]);
-                        timeStack.push(tmax);
-                        tmax = t;
-                    } 
-                    else 
-                        nearIndex = 1 ^ nearIndex;
-                }
-            }
-            node = node->child[nearIndex];
+            Vec3 n = outplane->n;
+            printf("x: %f y: %f z: %f\n t: %f\n", n.x, n.y, n.z, *thit);
+            return 1;
         }
         else
         {
-            // Now at a leaf. If it is solid, there’s a hit at time tmin, so exit
-            if (node->IsSolid())
-            {
-                *thit = tmin;
-                return 1;
-            }
-            // Exit if no more subtrees to visit, else pop off a node and continue
-            if (nodeStack.empty()) break;
-
-            tmin = tmax;
-            node = nodeStack.top(); nodeStack.pop();
-            tmax = timeStack.top(); timeStack.pop();
+            return 0;
         }
     }
-    // No hit
-    return 0;
+
+    i32 aPoint = (i32)((Vec3Dot(node->plane.n, a) + node->plane.d) < 0);
+    i32 bPoint = (i32)((Vec3Dot(node->plane.n, b) + node->plane.d) < 0);
+    
+    if(aPoint == POINT_IN_FRONT_OF_PLANE && bPoint == POINT_IN_FRONT_OF_PLANE)
+    {
+        // the ray is infront of the plane we travers the front side
+        return RayIntersect(node->front, a, b, thit, outplane);
+    }
+    else if(aPoint == POINT_BEHIND_PLANE && bPoint == POINT_BEHIND_PLANE)
+    {
+        // the ray is behind of the plane we travers the back side
+        return RayIntersect(node->back, a, b, thit, outplane);
+    }
+    else
+    {
+        // here the ray intersect the plane, so we check for the intersection and split the ray
+        f32 t = -1.0f;
+        Vec3 q;
+        if(IntersectionLinePlane(a, b, node->plane, t, q))
+        {
+            bool frontResult, backResult;
+            if(aPoint == POINT_IN_FRONT_OF_PLANE)
+            {
+                // TODO: fix the t
+                *thit = t;
+                *outplane = node->plane;
+
+                // check the front part
+                frontResult = RayIntersect(node->front, a, q, thit, outplane);
+                // check the back part
+                backResult = RayIntersect(node->back, q, b, thit, outplane);
+            }
+            else
+            {
+                // check the back part
+                frontResult = RayIntersect(node->back, a, q, thit, outplane);
+                // check the front part
+                backResult = RayIntersect(node->front, q, b, thit, outplane);
+            }
+            return frontResult || backResult;
+        }
+        else
+        {
+            return 0;
+        }
+
+    }
 }
 
 i32 main(void)
@@ -653,7 +704,7 @@ i32 main(void)
         &layout);
 
     // TODO: try to parse the valve's .map file
-    //Win32File mapFile = Win32ReadFile("../src/error.map", &resourcesArena);
+    //Win32File mapFile = Win32ReadFile("../src/cube.map", &resourcesArena);
     Win32File mapFile = Win32ReadFile("../src/test.map", &resourcesArena);
     //Win32File mapFile = Win32ReadFile("../src/test2.map", &resourcesArena);
     ParseMapFile(&mapFile, gameState);
@@ -668,25 +719,10 @@ i32 main(void)
         brushes->AddBrush(GetIBrush(brush));
     }
 
-    
-/*
-    for(i32 i = 1; i < 14; i++)
-    {
-        if(i == 13)
-        {
-            i++;
-        }
-        brush = &map->entities[0].brushes[i];
-        brushes->AddBrush(GetIBrush(brush));
-    }
-*/
-
     Poly *polygons = brushes->MergeList();
 
     i32 polysCount = polygons->GetNumberOfPolysInList();
-    // Triangulize the poygons
     
-    // TODO: try to build the bsp tree
     std::vector<Poly *> pPolygons;
     for(Poly *polygon = polygons; polygon; polygon = polygon->next)
     {
@@ -697,6 +733,7 @@ i32 main(void)
     
     std::vector<Vertex> vertices;
 
+    // Triangulize the poygons
     for(i32 j = 0; j < pPolygons.size(); ++j)
     {
         Poly *polygon = pPolygons[j];
@@ -712,15 +749,16 @@ i32 main(void)
         }
     }
 
-
-
+    // build the bsp tree
     BSPNode *bspRoot = BuildBSPTree(pPolygons, BSP_ROOT);
 
     i32 verticesCount = vertices.size();
     Win32VertexBuffer vertexBuffer = Win32LoadVertexBuffer(&renderer, vertices.data(), vertices.size(), layout);
 
+    Win32VertexBuffer cubeBuffer = Win32LoadVertexBuffer(&renderer, cubeVertices, ARRAY_LENGTH(cubeVertices), layout);
+
     f32 rotationY = 0.0f;
-    Vec3 playerP = {0, 1.2, -1.8};
+    Vec3 playerP = {0.5, 0.5, -1.8};
     Vec3 playerV = {0, 0, 0};
     Vec3 playerA = {0, -1, 0};
 
@@ -751,7 +789,52 @@ i32 main(void)
         }
         dir = Mat4TransformVector(Mat4RotateY(rotationY), dir);
         Vec3 right = Vec3Normalized(Vec3Cross(dir, up));
+#if 1
 
+
+        Vec3 velocity = {};
+        if(KeyPress('A'))
+        {
+            velocity = velocity + right;
+        }
+        if(KeyPress('D'))
+        {
+            velocity = velocity - right; 
+        }
+        if(KeyPress('W'))
+        {
+            velocity = velocity + dir;
+        }
+        if(KeyPress('S'))
+        {
+            velocity = velocity - dir;
+        }
+        if(KeyPress('R'))
+        {
+            velocity.y += 1.0;
+        }
+        if(KeyPress('F'))
+        {
+            velocity.y -= 1.0;
+        }
+
+        velocity = Vec3Normalized(velocity) * 0.016;
+
+
+        f32 t = -1;
+        Plane plane;
+        if(RayIntersect(bspRoot, playerP, playerP + velocity, &t, &plane) == 1)
+        {
+            Vec3 n = plane.n;
+            playerP = (playerP + velocity*t) + (n * 0.005f);
+            velocity = velocity - (n * Vec3Dot(velocity, n));
+            velocity = Vec3Normalized(velocity) * 0.016;
+        }
+
+        playerP = playerP + velocity;
+
+
+#else
         Vec3 newPlayerP = playerP;
         if(KeyPress('A'))
         {
@@ -789,14 +872,21 @@ i32 main(void)
 
         i32 result = PointInSolidSpace(bspRoot, newPlayerP);
         
-        printf("Point: %s\n", options[result]);
-
+        if(result == POINT_BEHIND_PLANE ||
+           result == POINT_ON_PLANE)
+        {
+            printf("Point: %s\n", options[result]);
+        }
         if(result == POINT_IN_FRONT_OF_PLANE)
         {
             playerP = newPlayerP;
         }
+#endif
+
+
         
-        cbuffer.view = Mat4LookAt(playerP, playerP + dir, up);
+        Vec3 cameraP = (playerP - dir * 1.0f) + up * 0.3;
+        cbuffer.view = Mat4LookAt(cameraP, playerP, up);
         Win32UpdateConstBuffer(&renderer, &constBuffer, (void *)&cbuffer);
 
         float clearColor[] = { 0.2, 0.2, 0.2, 1 };
@@ -809,10 +899,21 @@ i32 main(void)
         // Here goes the rendering code
         u32 stride = sizeof(Vertex);
         u32 offset = 0;
+        renderer.deviceContext->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+
+        cbuffer.wolrd = Mat4Identity();
+        Win32UpdateConstBuffer(&renderer, &constBuffer, (void *)&cbuffer);
+
         renderer.deviceContext->IASetInputLayout(vertexBuffer.layout);
         renderer.deviceContext->IASetVertexBuffers(0, 1, &vertexBuffer.GPUBuffer, &stride, &offset);
-        renderer.deviceContext->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
         renderer.deviceContext->Draw(vertexBuffer.verticesCount, 0);
+
+        cbuffer.wolrd = Mat4Translate(playerP.x, playerP.y, playerP.z) * Mat4Scale(0.1, 0.1, 0.1);
+        Win32UpdateConstBuffer(&renderer, &constBuffer, (void *)&cbuffer);
+
+        renderer.deviceContext->IASetInputLayout(cubeBuffer.layout);
+        renderer.deviceContext->IASetVertexBuffers(0, 1, &cubeBuffer.GPUBuffer, &stride, &offset);
+        renderer.deviceContext->Draw(cubeBuffer.verticesCount, 0);
 
         renderer.swapChain->Present(1, 0);
 

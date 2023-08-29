@@ -166,8 +166,8 @@ struct BSPNode
     {
         struct 
         {
-            BSPNode *back;
             BSPNode *front;
+            BSPNode *back;
         };
         BSPNode *child[2];
     };

@@ -16,7 +16,7 @@ bool PlaneGetIntersection(const Plane &plane,
                            const Vec3 &Start, const Vec3 &End,
                            Vec3 &Intersection, f32 &Percentage )
 {
-    Vec3	Direction = End - Start;
+    Vec3 Direction = End - Start;
     f32	Num, Denom;
 
     Vec3Normalize(&Direction);
@@ -35,7 +35,6 @@ bool PlaneGetIntersection(const Plane &plane,
 
     return true;
 }
-
 
 i32 Poly::GetNumberOfPolysInList() const
 {
