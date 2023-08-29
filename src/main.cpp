@@ -596,14 +596,14 @@ int IntersectionLinePlane(Vec3 a, Vec3 b, Plane p, f32 &t, Vec3 &q)
     return 0;
 }
 
-int RayIntersect(BSPNode *node, Vec3 a, Vec3 b, f32 *thit, Plane *outplane)
+int RayIntersect(BSPNode *node, Vec3 a, Vec3 b, Vec3 *outpoint, Plane *outplane)
 {
     if(node->IsLeaf())
     {
         if(node->IsSolid())
         {
             Vec3 n = outplane->n;
-            printf("x: %f y: %f z: %f\n t: %f\n", n.x, n.y, n.z, *thit);
+            printf("x: %f y: %f z: %f\n", n.x, n.y, n.z);
             return 1;
         }
         else
@@ -618,12 +618,12 @@ int RayIntersect(BSPNode *node, Vec3 a, Vec3 b, f32 *thit, Plane *outplane)
     if(aPoint == POINT_IN_FRONT_OF_PLANE && bPoint == POINT_IN_FRONT_OF_PLANE)
     {
         // the ray is infront of the plane we travers the front side
-        return RayIntersect(node->front, a, b, thit, outplane);
+        return RayIntersect(node->front, a, b, outpoint, outplane);
     }
     else if(aPoint == POINT_BEHIND_PLANE && bPoint == POINT_BEHIND_PLANE)
     {
-        // the ray is behind of the plane we travers the back side
-        return RayIntersect(node->back, a, b, thit, outplane);
+        // the ray is behind of the plane we travers the back side 
+        return RayIntersect(node->back, a, b, outpoint, outplane);
     }
     else
     {
@@ -636,20 +636,20 @@ int RayIntersect(BSPNode *node, Vec3 a, Vec3 b, f32 *thit, Plane *outplane)
             if(aPoint == POINT_IN_FRONT_OF_PLANE)
             {
                 // TODO: fix the t
-                *thit = t;
+                *outpoint = q;
                 *outplane = node->plane;
 
                 // check the front part
-                frontResult = RayIntersect(node->front, a, q, thit, outplane);
+                frontResult = RayIntersect(node->front, a, q, outpoint, outplane);
                 // check the back part
-                backResult = RayIntersect(node->back, q, b, thit, outplane);
+                backResult = RayIntersect(node->back, q, b, outpoint, outplane);
             }
             else
             {
                 // check the back part
-                frontResult = RayIntersect(node->back, a, q, thit, outplane);
+                frontResult = RayIntersect(node->back, a, q, outpoint, outplane);
                 // check the front part
-                backResult = RayIntersect(node->front, q, b, thit, outplane);
+                backResult = RayIntersect(node->front, q, b, outpoint, outplane);
             }
             return frontResult || backResult;
         }
@@ -758,7 +758,7 @@ i32 main(void)
     Win32VertexBuffer cubeBuffer = Win32LoadVertexBuffer(&renderer, cubeVertices, ARRAY_LENGTH(cubeVertices), layout);
 
     f32 rotationY = 0.0f;
-    Vec3 playerP = {0.5, 0.5, -1.8};
+    Vec3 playerP = {1.2, 0.5, -1.8};
     Vec3 playerV = {0, 0, 0};
     Vec3 playerA = {0, -1, 0};
 
@@ -789,8 +789,6 @@ i32 main(void)
         }
         dir = Mat4TransformVector(Mat4RotateY(rotationY), dir);
         Vec3 right = Vec3Normalized(Vec3Cross(dir, up));
-#if 1
-
 
         Vec3 velocity = {};
         if(KeyPress('A'))
@@ -821,67 +819,36 @@ i32 main(void)
         velocity = Vec3Normalized(velocity) * 0.016;
 
 
-        f32 t = -1;
+        Vec3 q;
         Plane plane;
-        if(RayIntersect(bspRoot, playerP, playerP + velocity, &t, &plane) == 1)
-        {
-            Vec3 n = plane.n;
-            playerP = (playerP + velocity*t) + (n * 0.005f);
-            velocity = velocity - (n * Vec3Dot(velocity, n));
-            velocity = Vec3Normalized(velocity) * 0.016;
-        }
-
-        playerP = playerP + velocity;
-
-
-#else
-        Vec3 newPlayerP = playerP;
-        if(KeyPress('A'))
-        {
-            newPlayerP = newPlayerP + right * 0.016;
-        }
-        if(KeyPress('D'))
-        {
-            newPlayerP = newPlayerP - right * 0.016; 
-        }
-        if(KeyPress('W'))
-        {
-            newPlayerP = newPlayerP + dir * 0.016;
-        }
-        if(KeyPress('S'))
-        {
-            newPlayerP = newPlayerP - dir * 0.016;
-        }
-        if(KeyPress('R'))
-        {
-            newPlayerP.y += 0.016;
-        }
-        if(KeyPress('F'))
-        {
-            newPlayerP.y -= 0.016;
-        }
-
-        //playerP = newPlayerP;
-       
-        char *options[] =
-        {
-            "POINT_IN_FRONT_OF_PLANE",
-            "POINT_BEHIND_PLANE",
-            "POINT_ON_PLANE"
-        };
-
-        i32 result = PointInSolidSpace(bspRoot, newPlayerP);
         
-        if(result == POINT_BEHIND_PLANE ||
-           result == POINT_ON_PLANE)
+        i32 iterations = 100;
+
+        i32 collisionCount = RayIntersect(bspRoot, playerP, playerP + velocity, &q, &plane);
+
+        while(Vec3LenSq(velocity) > FLT_EPSILON && iterations >= 0)
         {
-            printf("Point: %s\n", options[result]);
+            if(collisionCount)
+            {
+                Vec3 n = plane.n;
+                Vec3 newP =  q + (n * 0.002f);
+
+                if(!PointInSolidSpace(bspRoot, newP))
+                {
+                    playerP = newP;
+                    velocity = velocity - (n * Vec3Dot(velocity, n));
+                    collisionCount = RayIntersect(bspRoot, playerP, playerP + velocity, &q, &plane);
+                }
+            }
+            else
+            {
+                playerP = playerP + velocity;
+                break;
+            }
+            iterations--;
+
         }
-        if(result == POINT_IN_FRONT_OF_PLANE)
-        {
-            playerP = newPlayerP;
-        }
-#endif
+
 
 
         
@@ -908,7 +875,7 @@ i32 main(void)
         renderer.deviceContext->IASetVertexBuffers(0, 1, &vertexBuffer.GPUBuffer, &stride, &offset);
         renderer.deviceContext->Draw(vertexBuffer.verticesCount, 0);
 
-        cbuffer.wolrd = Mat4Translate(playerP.x, playerP.y, playerP.z) * Mat4Scale(0.1, 0.1, 0.1);
+        cbuffer.wolrd = Mat4Translate(playerP.x, playerP.y + 0.04, playerP.z) * Mat4Scale(0.1, 0.1, 0.1);
         Win32UpdateConstBuffer(&renderer, &constBuffer, (void *)&cbuffer);
 
         renderer.deviceContext->IASetInputLayout(cubeBuffer.layout);
