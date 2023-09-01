@@ -343,8 +343,7 @@ static Win32File Win32ReadFile(char *filepath, Arena *arena)
 }
 
 static Win32Shader Win32LoadShader(Win32Renderer *renderer,
-                                   Memory *memory, Arena *arena,
-                                   char *vertpath, char *fragpath)
+                                   Memory *memory, char *vertpath, char *fragpath)
 {
     Win32Shader shader = {};
 

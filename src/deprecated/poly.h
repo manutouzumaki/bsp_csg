@@ -24,7 +24,6 @@ struct  Poly
 
     Poly();
     ~Poly();
-
 };
 
 #endif

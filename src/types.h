@@ -75,7 +75,7 @@ struct CBuffer
     Mat4 wolrd;
 };
 
-struct Face
+struct MapFace
 {
     char textureName[32];
     Vec4 u, v;
@@ -85,21 +85,21 @@ struct Face
     f32 vScale;
 };
 
-struct Brush
+struct MapBrush
 {
-    Face faces[32];
+    MapFace *faces;
     u32 facesCount;
 };
 
-struct Entity
+struct MapEntity
 {
-    Brush brushes[32];
+    MapBrush *brushes;
     u32 brushesCount;
 };
 
 struct Map
 {
-    Entity entities[32];
+    MapEntity *entities;
     u32 entitiesCount;
 };
 
@@ -113,19 +113,6 @@ struct PolygonData
 {
     std::vector<Vertex> vertices; 
     Plane plane;
-};
-
-struct CSGBrush
-{
-    std::vector<PolygonData> polygons;
-};
-
-enum PolygonPlane
-{
-    FRONT,
-    BACK,
-    ONPLANE,
-    SPLIT 
 };
 
 enum ClassifyPolygon
@@ -143,8 +130,6 @@ enum ClassifyPoint
     POINT_ON_PLANE
 };
 
-struct Poly;
-
 enum BSPState
 {
     BSP_ROOT,
@@ -152,49 +137,9 @@ enum BSPState
     BSP_BACK
 };
 
-enum BSPType
-{
-    BSP_TYPE_NODE,
-    BSP_TYPE_SOLID,
-    BSP_TYPE_EMPTY
-};
-
-struct BSPNode
-{
-    Plane plane;
-    union
-    {
-        struct 
-        {
-            BSPNode *front;
-            BSPNode *back;
-        };
-        BSPNode *child[2];
-    };
-    BSPType type;
-
-    bool IsLeaf() 
-    {
-        if(front == 0 && back == 0)
-            return true;
-        return false;
-    }
-
-    bool IsSolid()
-    {
-        return type == BSP_TYPE_SOLID;
-    }
-
-    BSPNode(BSPType type);
-    BSPNode(BSPNode *front, BSPNode *back, Plane plane);
-
-    ~BSPNode();
-
-};
-
 struct GameState
 {
-    Map map;
+    u32 pad;
 };
 
 #endif

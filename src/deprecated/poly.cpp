@@ -1,4 +1,4 @@
-PolygonPlane ClassifyPoint(const Plane &plane, const Vec3 &v)
+PolygonPlane ClassifyPoint_(const Plane &plane, const Vec3 &v)
 {
     f32 distance = Vec3Dot(plane.n, v) + plane.d;
     if(distance > SMALL_EPSILON)
@@ -53,7 +53,7 @@ void Poly::SplitPoly(Poly *pPoly_, Poly **ppFront, Poly **ppBack)
     // Classify all point
     for(i32 i = 0; i < pPoly_->numberOfVertices; i++)
     {
-        pCP[i] = ClassifyPoint(plane, pPoly_->verts[i].position); 
+        pCP[i] = ClassifyPoint_(plane, pPoly_->verts[i].position); 
     }
 
     // Build fragments
@@ -407,7 +407,6 @@ bool Poly::operator == (const Poly &arg_) const
     }
     return false;
 }
-
 
 void Poly::SetNext(Poly *poly)
 {

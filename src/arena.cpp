@@ -43,7 +43,7 @@ void *ArenaPush(Arena *arena, size_t size)
 }
 
 #define ArenaPushStruct(arena, type) ArenaPush(arena, sizeof(type))
-#define ArenaPushArray(arena, count, type) ArenaPush(arena, sizeof(type)*(count))
+#define ArenaPushArray(arena, count, type) ArenaPush(arena, (sizeof(type)*(count)))
 
 #define ArenaTmpBegin(memory, arena) ArenaCreate(memory, arena)
 void ArenaTmpEnd(Memory *memory, Arena *arena)
@@ -52,82 +52,52 @@ void ArenaTmpEnd(Memory *memory, Arena *arena)
     memory->used -= arena->size;
 }
 
+//
+// ArenaArray implementation
+//
 
-/*
-LinkList LinkListCreate(size_t dataSize, Arena *arena)
+#define GetRawData(array) ((u32 *)(array) - 2)
+#define GetCapacity(array) (GetRawData(array)[0])
+#define GetSize(array) (GetRawData(array)[1])
+
+void *ArenaArrayCreate_(Arena *arena, size_t elementSize, u32 elementCount)
 {
-    LinkList linkList = {};
-    linkList.arena = arena;
-    linkList.dataSize = dataSize;
-    linkList.front = 0;
-    linkList.back = 0;
-    linkList.free = 0;
-    return linkList;
+    u32 rawSize = sizeof(u32) * 2 + (elementSize * elementCount);
+    u32 *base = (u32 *)ArenaPush(arena, rawSize);
+    base[0] = elementCount;
+    base[1] = 0;
+    return (void *)(base + 2);
 }
 
-LinkNode *LinkListAdd(LinkList *linkList, void *data)
+void *ArenaArrayPush_(void *array, size_t elementSize)
 {
-    if(linkList->front == 0 && linkList->free == 0)
-    {
-        // add the element to the first
-        u8 *mem = (u8 *)ArenaPush(linkList->arena, linkList->dataSize * sizeof(LinkNode));
-        LinkNode *node = (LinkNode *)mem;
-        node->data = (void *)((u8 *)node + sizeof(LinkNode));
-        memcpy(node->data, data, linkList->dataSize);
-        node->next = 0;
-        linkList->front = node;
-        linkList->back = linkList->front;
-        return node;
-    }
-    else if(linkList->free == 0)
-    {
-        u8 *mem = (u8 *)ArenaPush(linkList->arena, linkList->dataSize * sizeof(LinkNode));
-        LinkNode *node = (LinkNode *)mem;
-        node->data = (void *)((u8 *)node + sizeof(LinkNode));
-        memcpy(node->data, data, linkList->dataSize);
-        node->next = 0;
-        node->prev = linkList->back;
-        linkList->back->next = node;
-        linkList->back = linkList->back->next;
-        return node;
-    }
-    else
-    {
-        // use one node frome the free list
-        LinkNode *node = linkList->free;
-        linkList->free = linkList->free->next;
-        node->data = (void *)((u8 *)node + sizeof(LinkNode));
-        memcpy(node->data, data, linkList->dataSize);
-        node->next = 0;
-        node->prev = linkList->back;
-        linkList->back->next = node;
-        linkList->back = linkList->back->next;
-        return node;
-    }
+    ASSERT(array != 0); ASSERT(GetSize(array) + 1 <= GetCapacity(array));
+    void *element = (void *)((u8 *)array + (GetSize(array) * elementSize));
+    GetSize(array)++;
+    return element;
 }
 
-void LinkListRemove(LinkList *linkList, LinkNode *n)
+#define ArenaArrayCreate(arena, type, count) (type *)ArenaArrayCreate_(arena, sizeof(type), count)
+#define ArenaArrayPush(array, element, type)                    \
+    do {                                                        \
+        type *e = (type *)ArenaArrayPush_(array, sizeof(type)); \
+        *e = (element);                                         \
+    }while(0); 
+
+u32 ArenaArraySize(void *array)
 {
-    if(n == linkList->front)
-    {
-        n->next->prev = 0;
-        linkList->front = n->next;
-    }
-    else if(n == linkList->back)
-    {
-        n->prev->next = 0;
-        linkList->back = n->prev;
-    }
-    else
-    {
-        n->prev->next = n->next;
-        n->next->prev = n->prev;
-    }
-
-    n->prev = 0;
-    n->next = 0;
-
-    linkList->free = n;
-
+    ASSERT(array != 0);
+    return GetSize(array);
 }
-*/
+
+u32 ArenaArrayCapacity(void *array)
+{
+    ASSERT(array != 0);
+    return GetCapacity(array);
+}
+
+void ArenaArrayClear(void *array)
+{
+    ASSERT(array != 0);
+    GetSize(array) = 0;
+}

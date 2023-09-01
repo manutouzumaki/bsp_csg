@@ -6,7 +6,7 @@
 #define MAT_EPSILON 0.000001f
 #define     EPSILON 0.0001f
 #define VEC_EPSILON 0.0001f
-#define SMALL_EPSILON 1e-5
+#define SMALL_EPSILON 0.000001f
 #define BIG_EPSILON 0.01f
 //#define VEC_EPSILON 0.000001f
 #define PI 3.14159265359
