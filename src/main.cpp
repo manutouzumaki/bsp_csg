@@ -360,30 +360,29 @@ static int RayIntersect2(BSPNode *node, Vec3 p, Vec3 d, f32 tmin, f32 tmax, f32 
     ASSERT(node != NULL);
     while (1) 
     {
-        if(Vec3LenSq(d))
-        {
-            i32 StopHere = 0;
-        }
-
         if(!BSPNodeIsLeaf(node))
         {
+            if(Vec3LenSq(d) > 0)
+            {
+                i32 StopHere = 0;
+            }
             Vec3Normalize(&node->plane.n);
-            f32 denom = Vec3Dot(node->plane.n, d);
-            f32 dist =  Vec3Dot(node->plane.n, p) + node->plane.d; 
-            i32 nearIndex = dist < 0.0f;
+            f64 denom = Vec3Dot64(node->plane.n, d);
+            f64 dist =  Vec3Dot64(node->plane.n, p) + (f64)node->plane.d; 
+            i32 nearIndex = dist < 0.0;
             // If denom is zero, ray runs parallel to plane. In this case,
             // just fall through to visit the near side (the one p lies on)
-            if (denom != 0.0f) 
+            if (denom != 0.0) 
             {
-                f32 t = -dist / denom;
-                if (0.0f <= t && t <= tmax) 
+                f64 t = -dist / denom;
+                if (0.0 <= t && t <= (f64)tmax) 
                 {
                     if (t >= tmin)
                     {
                         // Straddling, push far side onto stack, then visit near side
                         nodeStack.push(node->child[1 ^ nearIndex]);
                         timeStack.push(tmax);
-                        tmax = t;
+                        tmax = (f32)t;
                         *outplane = node->plane;
                     } 
                     else nearIndex = 1 ^ nearIndex;
@@ -396,8 +395,8 @@ static int RayIntersect2(BSPNode *node, Vec3 p, Vec3 d, f32 tmin, f32 tmax, f32 
             // Now at a leaf. If it is solid, there’s a hit at time tmin, so exit
             if (BSPNodeIsSolid(node))
             {
-                Vec3 n = outplane->n;
-                printf("x: %f y: %f z: %f d: %f, t: %f\n", n.x, n.y, n.z, outplane->d, tmin);
+                //Vec3 n = outplane->n;
+                //printf("x: %f y: %f z: %f d: %f\n", n.x, n.y, n.z, outplane->d);
                 *thit = tmin;
                 return 1;
             }
@@ -658,12 +657,19 @@ i32 main(void)
 
         velocity = Vec3Normalized(velocity) * 0.016 * 2;
 
+
+
+        if(PointInSolidSpaceRecursive(bspRoot, playerP))
+        {
+            printf("Hit\n");
+        }
+
 #if 1
         f32 t;
         Plane plane;
         i32 iterations = 100;
 
-        i32 collisionCount = RayIntersect2(bspRoot, playerP, velocity, 0.0, 1.0, &t, &plane);
+        i32 collisionCount = RayIntersect2(bspRoot, playerP, velocity, 0.0f, 1.0f, &t, &plane);
         while(Vec3LenSq(velocity) > FLT_EPSILON && iterations >= 0)
         {
             if(collisionCount)
@@ -709,10 +715,10 @@ i32 main(void)
 #endif
 
 
-        Vec3 cameraP = (playerP - dir * 1.0f) + up * 0.3;
-        cbuffer.view = Mat4LookAt(cameraP, playerP, up);
-        //Vec3 cameraP = playerP + up * 0.2;
-        //cbuffer.view = Mat4LookAt(cameraP, cameraP + dir, up);
+        //Vec3 cameraP = (playerP - dir * 1.0f) + up * 0.3;
+        //cbuffer.view = Mat4LookAt(cameraP, playerP, up);
+        Vec3 cameraP = playerP + up * 0.2;
+        cbuffer.view = Mat4LookAt(cameraP, cameraP + dir, up);
         Win32UpdateConstBuffer(&renderer, &constBuffer, (void *)&cbuffer);
 
         float clearColor[] = { 0.2, 0.2, 0.2, 1 };
@@ -734,12 +740,12 @@ i32 main(void)
         renderer.deviceContext->IASetVertexBuffers(0, 1, &vertexBuffer.GPUBuffer, &stride, &offset);
         renderer.deviceContext->Draw(vertexBuffer.verticesCount, 0);
 
-        cbuffer.wolrd = Mat4Translate(playerP.x, playerP.y, playerP.z) * Mat4Scale(0.2, 0.2, 0.2);
-        Win32UpdateConstBuffer(&renderer, &constBuffer, (void *)&cbuffer);
+        //cbuffer.wolrd = Mat4Translate(playerP.x, playerP.y, playerP.z) * Mat4Scale(0.2, 0.2, 0.2);
+        //Win32UpdateConstBuffer(&renderer, &constBuffer, (void *)&cbuffer);
 
-        renderer.deviceContext->IASetInputLayout(cubeBuffer.layout);
-        renderer.deviceContext->IASetVertexBuffers(0, 1, &cubeBuffer.GPUBuffer, &stride, &offset);
-        renderer.deviceContext->Draw(cubeBuffer.verticesCount, 0);
+        //renderer.deviceContext->IASetInputLayout(cubeBuffer.layout);
+        //renderer.deviceContext->IASetVertexBuffers(0, 1, &cubeBuffer.GPUBuffer, &stride, &offset);
+        //renderer.deviceContext->Draw(cubeBuffer.verticesCount, 0);
 
         renderer.swapChain->Present(1, 0);
 
