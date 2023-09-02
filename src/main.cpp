@@ -159,7 +159,7 @@ static void ParseMapFile(Win32File *file, Map *map, Arena *arena)
 static bool GetIntersection(Vec3 n1, Vec3 n2, Vec3 n3, f32 d1, f32 d2, f32 d3, Vertex *vertex)
 {
     f32 denom = Vec3Dot(n1, Vec3Cross(n2, n3));
-    if(denom <= VEC_EPSILON && denom >= -VEC_EPSILON)
+    if(denom <= FLT_EPSILON && denom >= -FLT_EPSILON)
     {
         return false;
     }
@@ -315,30 +315,10 @@ static int PointInSolidSpace(BSPNode *node, Vec3 p)
     while(!BSPNodeIsLeaf(node))
     {
         f32 dist = Vec3Dot(node->plane.n, p) + node->plane.d;
-        node = node->child[dist < EPSILON];
+        node = node->child[dist < FLT_EPSILON];
     }
     // Now at a leaf, inside/outside status determined by solid flag
     return BSPNodeIsSolid(node) ? POINT_BEHIND_PLANE : POINT_IN_FRONT_OF_PLANE;
-}
-
-static int PointInSolidSpaceRecursive(BSPNode *node, Vec3 p)
-{
-    if(node == 0) return POINT_IN_FRONT_OF_PLANE;
-    if(BSPNodeIsLeaf(node))
-    {
-        if(BSPNodeIsSolid(node))
-        {
-            return POINT_BEHIND_PLANE;
-        }
-        else
-        {
-            return POINT_IN_FRONT_OF_PLANE;
-        }
-    }
-
-    f32 dist = Vec3Dot(node->plane.n, p) + node->plane.d;
-    i32 index = dist < EPSILON;
-    return PointInSolidSpaceRecursive(node->child[index], p);
 }
 
 static int IntersectionLinePlane(Vec3 a, Vec3 b, Plane p, f32 &t, Vec3 &q)
@@ -353,66 +333,6 @@ static int IntersectionLinePlane(Vec3 a, Vec3 b, Plane p, f32 &t, Vec3 &q)
     return 0;
 }
 
-static int RayIntersect2(BSPNode *node, Vec3 p, Vec3 d, f32 tmin, f32 tmax, f32 *thit, Plane *outplane)
-{
-    std::stack<BSPNode *> nodeStack;
-    std::stack<f32> timeStack;
-    ASSERT(node != NULL);
-    while (1) 
-    {
-        if(!BSPNodeIsLeaf(node))
-        {
-            if(Vec3LenSq(d) > 0)
-            {
-                i32 StopHere = 0;
-            }
-            Vec3Normalize(&node->plane.n);
-            f64 denom = Vec3Dot64(node->plane.n, d);
-            f64 dist =  Vec3Dot64(node->plane.n, p) + (f64)node->plane.d; 
-            i32 nearIndex = dist < 0.0;
-            // If denom is zero, ray runs parallel to plane. In this case,
-            // just fall through to visit the near side (the one p lies on)
-            if (denom != 0.0) 
-            {
-                f64 t = -dist / denom;
-                if (0.0 <= t && t <= (f64)tmax) 
-                {
-                    if (t >= tmin)
-                    {
-                        // Straddling, push far side onto stack, then visit near side
-                        nodeStack.push(node->child[1 ^ nearIndex]);
-                        timeStack.push(tmax);
-                        tmax = (f32)t;
-                        *outplane = node->plane;
-                    } 
-                    else nearIndex = 1 ^ nearIndex;
-                }
-            }
-            node = node->child[nearIndex];
-        }
-        else
-        {
-            // Now at a leaf. If it is solid, there’s a hit at time tmin, so exit
-            if (BSPNodeIsSolid(node))
-            {
-                //Vec3 n = outplane->n;
-                //printf("x: %f y: %f z: %f d: %f\n", n.x, n.y, n.z, outplane->d);
-                *thit = tmin;
-                return 1;
-            }
-
-            // Exit if no more subtrees to visit, else pop off a node and continue
-            if (nodeStack.empty()) break;
-
-            tmin = tmax;
-            node = nodeStack.top(); nodeStack.pop();
-            tmax = timeStack.top(); timeStack.pop();
-        }
-    }
-    // No hit
-    return 0;
-}
-
 static int RayIntersect(BSPNode *node, Vec3 a, Vec3 b, Vec3 *outpoint, Plane *outplane)
 {
     if(node == 0) return 0;
@@ -420,9 +340,7 @@ static int RayIntersect(BSPNode *node, Vec3 a, Vec3 b, Vec3 *outpoint, Plane *ou
     {
         if(BSPNodeIsSolid(node))
         {
-            Vec3 n = outplane->n;
-            printf("x: %f y: %f z: %f\n", n.x, n.y, n.z);
-            if(Vec3LenSq(outplane->n) > VEC_EPSILON)
+            if(Vec3LenSq(outplane->n) > FLT_EPSILON)
             {
                 return 1;
             }
@@ -442,8 +360,8 @@ static int RayIntersect(BSPNode *node, Vec3 a, Vec3 b, Vec3 *outpoint, Plane *ou
         i32 StopHere = 0;
     }
     // TODO: play with this EPSILON
-    i32 aPoint = (i32)(((Vec3Dot(node->plane.n, a) + node->plane.d) + EPSILON) < 0);
-    i32 bPoint = (i32)(((Vec3Dot(node->plane.n, b) + node->plane.d) + EPSILON) < 0);
+    i32 aPoint = (i32)(((Vec3Dot(node->plane.n, a) + node->plane.d)) < 0);
+    i32 bPoint = (i32)(((Vec3Dot(node->plane.n, b) + node->plane.d)) < 0);
     
     if(aPoint == POINT_IN_FRONT_OF_PLANE && bPoint == POINT_IN_FRONT_OF_PLANE)
     {
@@ -657,36 +575,6 @@ i32 main(void)
 
         velocity = Vec3Normalized(velocity) * 0.016 * 2;
 
-
-
-        if(PointInSolidSpaceRecursive(bspRoot, playerP))
-        {
-            printf("Hit\n");
-        }
-
-#if 1
-        f32 t;
-        Plane plane;
-        i32 iterations = 100;
-
-        i32 collisionCount = RayIntersect2(bspRoot, playerP, velocity, 0.0f, 1.0f, &t, &plane);
-        while(Vec3LenSq(velocity) > FLT_EPSILON && iterations >= 0)
-        {
-            if(collisionCount)
-            {
-                Vec3 n = plane.n;
-                playerP =  (playerP + velocity * t) + (n * 0.002f);
-                velocity = velocity - (n * Vec3Dot(velocity, n));
-                collisionCount = RayIntersect2(bspRoot, playerP, velocity, 0.0f, 1.0f, &t, &plane);
-            }
-            else
-            {
-                playerP = playerP + velocity;
-                break;
-            }
-            iterations--;
-        }
-#else
         Vec3 q;
         Plane plane;
         i32 iterations = 100;
@@ -707,13 +595,15 @@ i32 main(void)
             }
             else
             {
-                playerP = playerP + velocity;
+                Vec3 newP = playerP + velocity;
+                if(!PointInSolidSpace(bspRoot, newP))
+                {
+                    playerP = newP;
+                }
                 break;
             }
             iterations--;
         }
-#endif
-
 
         //Vec3 cameraP = (playerP - dir * 1.0f) + up * 0.3;
         //cbuffer.view = Mat4LookAt(cameraP, playerP, up);

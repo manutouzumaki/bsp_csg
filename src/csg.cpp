@@ -13,7 +13,7 @@ bool PlaneGetIntersection(const Plane &plane,
 
     denom = Vec3Dot(plane.n, direction);
 
-    if ( fabs ( denom ) < VEC_EPSILON )
+    if ( fabs ( denom ) < FLT_EPSILON )
     {
         return false;
     }
@@ -104,8 +104,9 @@ static bool CSGPolyCalculatePlane(CSGPoly *poly)
         centerOfMass.z += verts[ i ].position.z;
     }
 
-    if ( ( fabs ( poly->plane.n.x ) < SMALL_EPSILON ) && ( fabs ( poly->plane.n.y ) < SMALL_EPSILON ) &&
-		 ( fabs ( poly->plane.n.z ) < SMALL_EPSILON ) )
+    if ( ( fabs ( poly->plane.n.x ) < FLT_EPSILON ) &&
+         ( fabs ( poly->plane.n.y ) < FLT_EPSILON ) &&
+		 ( fabs ( poly->plane.n.z ) < FLT_EPSILON ) )
     {
          ASSERT(!"INVALID_CODE_PATH");
         return false;
@@ -113,7 +114,7 @@ static bool CSGPolyCalculatePlane(CSGPoly *poly)
 
     magnitude = sqrt ( poly->plane.n.x * poly->plane.n.x + poly->plane.n.y * poly->plane.n.y + poly->plane.n.z * poly->plane.n.z );
 
-    if ( magnitude < SMALL_EPSILON )
+    if ( magnitude < FLT_EPSILON )
 	{
         ASSERT(!"INVALID_CODE_PATH");
 		return false;
@@ -327,7 +328,7 @@ static CSGPoly *CSGPolyClip(CSGPoly *pThis, CSGPoly *poly, bool clipOnPlane, Are
         case POLYGON_COPLANAR_WITH_PLANE:
         {
             f32 angle = Vec3Dot(pThis->plane.n, poly->plane.n) - 1;
-            if((angle < VEC_EPSILON) && (angle > -VEC_EPSILON))
+            if((angle < FLT_EPSILON) && (angle > -FLT_EPSILON))
             {
                 if(!clipOnPlane)
                 {

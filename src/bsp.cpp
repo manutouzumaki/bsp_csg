@@ -3,9 +3,9 @@ static int ClassifyPointToPlane(Vec3 p, Plane plane)
     // Compute signed distance of point from plane
     f32 dist = Vec3Dot(plane.n, p) + plane.d;
     // Classify p based on the signed distance
-    if (dist > BIG_EPSILON)
+    if (dist > FLT_EPSILON)
         return POINT_IN_FRONT_OF_PLANE;
-    if (dist < -BIG_EPSILON)
+    if (dist < -FLT_EPSILON)
         return POINT_BEHIND_PLANE;
     return POINT_ON_PLANE;
 }
