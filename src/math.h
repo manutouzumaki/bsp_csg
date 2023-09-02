@@ -285,6 +285,21 @@ f32 Vec3Dot(Vec3 a, Vec3 b) {
     return result;
 }
 
+f64 Vec3Dot64(Vec3 a, Vec3 b)
+{
+    f64 ax = a.x;
+    f64 ay = a.y;
+    f64 az = a.z;
+
+    f64 bx = b.x;
+    f64 by = b.y;
+    f64 bz = b.z;
+    
+    f64 result = (ax * bx) + (ay * by) + (az * bz);
+    return result;
+
+}
+
 f32 Vec3LenSq(Vec3 v) {
     f32 result = Vec3Dot(v, v);
     return result;

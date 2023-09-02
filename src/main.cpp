@@ -338,10 +338,6 @@ static int PointInSolidSpaceRecursive(BSPNode *node, Vec3 p)
 
     f32 dist = Vec3Dot(node->plane.n, p) + node->plane.d;
     i32 index = dist < EPSILON;
-    if(node->plane.n.y == 1.0f && node->plane.d < 0 && node->plane.d > -1.06)
-    {
-        i32 StopHere = 0;
-    }
     return PointInSolidSpaceRecursive(node->child[index], p);
 }
 
@@ -366,27 +362,30 @@ static int RayIntersect2(BSPNode *node, Vec3 p, Vec3 d, f32 tmin, f32 tmax, f32 
     {
         if(!BSPNodeIsLeaf(node))
         {
-            f32 denom = -Vec3Dot(node->plane.n, d);
-            f32 dist = ((Vec3Dot(node->plane.n, p) + node->plane.d) + EPSILON);
-            i32 nearIndex = (i32)(dist < 0);
-            //i32 nearIndex = dist < 0;
+            if(Vec3LenSq(d) > 0)
+            {
+                i32 StopHere = 0;
+            }
+            Vec3Normalize(&node->plane.n);
+            f64 denom = Vec3Dot64(node->plane.n, d);
+            f64 dist =  Vec3Dot64(node->plane.n, p) + (f64)node->plane.d; 
+            i32 nearIndex = dist < 0.0;
             // If denom is zero, ray runs parallel to plane. In this case,
             // just fall through to visit the near side (the one p lies on)
-            if (denom != 0.0f) 
+            if (denom != 0.0) 
             {
-                f32 t = dist / denom;
-                if (0.0f <= t && t <= tmax) 
+                f64 t = -dist / denom;
+                if (0.0 <= t && t <= (f64)tmax) 
                 {
                     if (t >= tmin)
                     {
                         // Straddling, push far side onto stack, then visit near side
                         nodeStack.push(node->child[1 ^ nearIndex]);
                         timeStack.push(tmax);
-                        tmax = t;
+                        tmax = (f32)t;
                         *outplane = node->plane;
                     } 
-                    else 
-                        nearIndex = 1 ^ nearIndex;
+                    else nearIndex = 1 ^ nearIndex;
                 }
             }
             node = node->child[nearIndex];
@@ -396,12 +395,12 @@ static int RayIntersect2(BSPNode *node, Vec3 p, Vec3 d, f32 tmin, f32 tmax, f32 
             // Now at a leaf. If it is solid, there’s a hit at time tmin, so exit
             if (BSPNodeIsSolid(node))
             {
-                printf("t: %f\n", tmin);
-                Vec3 n = outplane->n;
-                printf("x: %f y: %f z: %f d: %f\n", n.x, n.y, n.z, outplane->d);
+                //Vec3 n = outplane->n;
+                //printf("x: %f y: %f z: %f d: %f\n", n.x, n.y, n.z, outplane->d);
                 *thit = tmin;
                 return 1;
             }
+
             // Exit if no more subtrees to visit, else pop off a node and continue
             if (nodeStack.empty()) break;
 
@@ -421,8 +420,8 @@ static int RayIntersect(BSPNode *node, Vec3 a, Vec3 b, Vec3 *outpoint, Plane *ou
     {
         if(BSPNodeIsSolid(node))
         {
-            //Vec3 n = outplane->n;
-            //printf("x: %f y: %f z: %f\n", n.x, n.y, n.z);
+            Vec3 n = outplane->n;
+            printf("x: %f y: %f z: %f\n", n.x, n.y, n.z);
             if(Vec3LenSq(outplane->n) > VEC_EPSILON)
             {
                 return 1;
@@ -569,7 +568,7 @@ i32 main(void)
     }
 
     brush = &map.entities[0].brushes[0];
-    f32 displacement = -0.05 * mapScale;
+    f32 displacement = -0.1 * mapScale;
     CSGBrush *disBrushes = GetCSGBrush(brush, &tmpArena, displacement);
     for(i32 i = 1; i < map.entities[0].brushesCount; i++)
     {
@@ -606,7 +605,7 @@ i32 main(void)
     Vec3 up  = {0, 1,  0};
     CBuffer cbuffer = {};
     cbuffer.view = Mat4LookAt(playerP, playerP + dir, up);
-    cbuffer.proj = Mat4Perspective(60, (f32)WINDOW_WIDTH/(f32)WINDOW_HEIGHT, 0.01f, 100.0f);
+    cbuffer.proj = Mat4Perspective(80, (f32)WINDOW_WIDTH/(f32)WINDOW_HEIGHT, 0.01f, 100.0f);
     cbuffer.wolrd = Mat4Identity();
     Win32ConstBuffer constBuffer = Win32LoadConstBuffer(&renderer, (void *)&cbuffer, sizeof(cbuffer), 0);
 
@@ -620,11 +619,11 @@ i32 main(void)
         rotationY = 0;
         if(KeyPress(VK_LEFT))
         {
-            rotationY = 0.016;
+            rotationY = 0.016 * 2;
         }
         if(KeyPress(VK_RIGHT))
         {
-            rotationY = -0.016;
+            rotationY = -0.016 * 2;
         }
         dir = Mat4TransformVector(Mat4RotateY(rotationY), dir);
         Vec3 right = Vec3Normalized(Vec3Cross(dir, up));
@@ -654,13 +653,18 @@ i32 main(void)
         {
             velocity.y -= 1.0;
         }
+        
 
-        velocity = Vec3Normalized(velocity) * 0.016;
+        velocity = Vec3Normalized(velocity) * 0.016 * 2;
 
 
-        PointInSolidSpaceRecursive(bspRoot, playerP);
 
-#if 0
+        if(PointInSolidSpaceRecursive(bspRoot, playerP))
+        {
+            printf("Hit\n");
+        }
+
+#if 1
         f32 t;
         Plane plane;
         i32 iterations = 100;
@@ -711,8 +715,10 @@ i32 main(void)
 #endif
 
 
-        Vec3 cameraP = (playerP - dir * 1.0f) + up * 0.3;
-        cbuffer.view = Mat4LookAt(cameraP, playerP, up);
+        //Vec3 cameraP = (playerP - dir * 1.0f) + up * 0.3;
+        //cbuffer.view = Mat4LookAt(cameraP, playerP, up);
+        Vec3 cameraP = playerP + up * 0.2;
+        cbuffer.view = Mat4LookAt(cameraP, cameraP + dir, up);
         Win32UpdateConstBuffer(&renderer, &constBuffer, (void *)&cbuffer);
 
         float clearColor[] = { 0.2, 0.2, 0.2, 1 };
@@ -734,12 +740,12 @@ i32 main(void)
         renderer.deviceContext->IASetVertexBuffers(0, 1, &vertexBuffer.GPUBuffer, &stride, &offset);
         renderer.deviceContext->Draw(vertexBuffer.verticesCount, 0);
 
-        cbuffer.wolrd = Mat4Translate(playerP.x, playerP.y, playerP.z) * Mat4Scale(0.1, 0.1, 0.1);
-        Win32UpdateConstBuffer(&renderer, &constBuffer, (void *)&cbuffer);
+        //cbuffer.wolrd = Mat4Translate(playerP.x, playerP.y, playerP.z) * Mat4Scale(0.2, 0.2, 0.2);
+        //Win32UpdateConstBuffer(&renderer, &constBuffer, (void *)&cbuffer);
 
-        renderer.deviceContext->IASetInputLayout(cubeBuffer.layout);
-        renderer.deviceContext->IASetVertexBuffers(0, 1, &cubeBuffer.GPUBuffer, &stride, &offset);
-        renderer.deviceContext->Draw(cubeBuffer.verticesCount, 0);
+        //renderer.deviceContext->IASetInputLayout(cubeBuffer.layout);
+        //renderer.deviceContext->IASetVertexBuffers(0, 1, &cubeBuffer.GPUBuffer, &stride, &offset);
+        //renderer.deviceContext->Draw(cubeBuffer.verticesCount, 0);
 
         renderer.swapChain->Present(1, 0);
 
