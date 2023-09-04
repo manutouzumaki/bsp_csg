@@ -3,9 +3,9 @@ static int ClassifyPointToPlane(Vec3 p, Plane plane)
     // Compute signed distance of point from plane
     f32 dist = Vec3Dot(plane.n, p) + plane.d;
     // Classify p based on the signed distance
-    if (dist > FLT_EPSILON)
+    if (dist > VEC_EPSILON)
         return POINT_IN_FRONT_OF_PLANE;
-    if (dist < -FLT_EPSILON)
+    if (dist < -VEC_EPSILON)
         return POINT_BEHIND_PLANE;
     return POINT_ON_PLANE;
 }
@@ -260,3 +260,102 @@ static BSPNode *BuildBSPTree(std::vector<CSGPoly *> &polygons, BSPState state, A
     return BSPNodeCreateNode(frontTree, backTree, splitPlane, bspArena);
 }
 
+static int PointInSolidSpace(BSPNode *node, Vec3 p)
+{
+    if(node == 0) return POINT_IN_FRONT_OF_PLANE;
+
+    while(!BSPNodeIsLeaf(node))
+    {
+        f32 dist = Vec3Dot(node->plane.n, p) + node->plane.d;
+        node = node->child[dist < FLT_EPSILON];
+    }
+    // Now at a leaf, inside/outside status determined by solid flag
+    return BSPNodeIsSolid(node) ? POINT_BEHIND_PLANE : POINT_IN_FRONT_OF_PLANE;
+}
+
+static int IntersectionLinePlane(Vec3 a, Vec3 b, Plane p, f32 &t, Vec3 &q)
+{
+    Vec3 ab = b - a;
+    t = (-p.d - Vec3Dot(p.n, a)) / Vec3Dot(p.n, ab);
+    if(t >= 0.0f && t <= 1.0f)
+    {
+        q = a + ab * t;
+        return 1;
+    }
+    return 0;
+}
+
+static int RayIntersect(BSPNode *node, Vec3 a, Vec3 b, Vec3 *outpoint, Plane *outplane)
+{
+    if(node == 0) return 0;
+    if(BSPNodeIsLeaf(node))
+    {
+        if(BSPNodeIsSolid(node))
+        {
+            if(Vec3LenSq(outplane->n) > FLT_EPSILON)
+            {
+                return 1;
+            }
+            else
+            {
+                return 0;
+            }
+        }
+        else
+        {
+            return 0;
+        }
+    }
+
+    if(node->plane.n.y == 1.0f && node->plane.d < 0 && node->plane.d > -1.06 && Vec3LenSq(b - a) > 0)
+    {
+        i32 StopHere = 0;
+    }
+    // TODO: play with this EPSILON
+    i32 aPoint = (i32)(((Vec3Dot(node->plane.n, a) + node->plane.d)) < BSP_EPSILON);
+    i32 bPoint = (i32)(((Vec3Dot(node->plane.n, b) + node->plane.d)) < BSP_EPSILON);
+    
+    if(aPoint == POINT_IN_FRONT_OF_PLANE && bPoint == POINT_IN_FRONT_OF_PLANE)
+    {
+        // the ray is infront of the plane we travers the front side
+        return RayIntersect(node->front, a, b, outpoint, outplane);
+    }
+    else if(aPoint == POINT_BEHIND_PLANE && bPoint == POINT_BEHIND_PLANE)
+    {
+        // the ray is behind of the plane we travers the back side 
+        return RayIntersect(node->back, a, b, outpoint, outplane);
+    }
+    else
+    {
+        // here the ray intersect the plane, so we check for the intersection and split the ray
+        f32 t = -1.0f;
+        Vec3 q;
+        if(IntersectionLinePlane(a, b, node->plane, t, q))
+        {
+            bool frontResult, backResult;
+            if(aPoint == POINT_IN_FRONT_OF_PLANE)
+            {
+                *outpoint = q;
+                *outplane = node->plane;
+
+                // check the front part
+                frontResult = RayIntersect(node->front, a, q, outpoint, outplane);
+                // check the back part
+                backResult = RayIntersect(node->back, q, b, outpoint, outplane);
+            }
+            else
+            {
+                // check the back part
+                frontResult = RayIntersect(node->back, a, q, outpoint, outplane);
+                // check the front part
+                backResult = RayIntersect(node->front, q, b, outpoint, outplane);
+            }
+            return frontResult || backResult;
+        }
+        else
+        {
+            return 0;
+        }
+
+    }
+}

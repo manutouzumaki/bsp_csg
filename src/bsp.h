@@ -8,6 +8,13 @@ enum BSPType
     BSP_TYPE_EMPTY
 };
 
+enum BSPState
+{
+    BSP_ROOT,
+    BSP_FRONT,
+    BSP_BACK
+};
+
 struct BSPNode
 {
     BSPType type;

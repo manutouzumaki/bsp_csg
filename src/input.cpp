@@ -76,3 +76,13 @@ i32 MousePosY()
 {
     return gCurrentInput.mouseY;
 }
+
+i32 MouseLastPosX()
+{
+    return gLastInput.mouseX;
+}
+
+i32 MouseLastPosY()
+{
+    return gLastInput.mouseY;
+}

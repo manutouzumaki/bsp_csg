@@ -75,71 +75,10 @@ struct CBuffer
     Mat4 wolrd;
 };
 
-struct MapFace
-{
-    char textureName[32];
-    Vec4 u, v;
-    Vec3 a, b, c;
-    f32 textureRotation;
-    f32 uScale;
-    f32 vScale;
-};
-
-struct MapBrush
-{
-    MapFace *faces;
-    u32 facesCount;
-};
-
-struct MapEntity
-{
-    MapBrush *brushes;
-    u32 brushesCount;
-};
-
-struct Map
-{
-    MapEntity *entities;
-    u32 entitiesCount;
-};
-
 struct Plane
 {
     Vec3 n;
     f32 d;
-};
-
-struct PolygonData
-{
-    std::vector<Vertex> vertices; 
-    Plane plane;
-};
-
-enum ClassifyPolygon
-{
-    POLYGON_COPLANAR_WITH_PLANE,
-    POLYGON_IN_FRONT_OF_PLANE,
-    POLYGON_BEHIND_PLANE,
-    POLYGON_STRADDLING_PLANE
-};
-
-enum ClassifyPoint
-{
-    POINT_IN_FRONT_OF_PLANE,
-    POINT_BEHIND_PLANE,
-    POINT_ON_PLANE
-};
-
-enum BSPState
-{
-    BSP_ROOT,
-    BSP_FRONT,
-    BSP_BACK
-};
-
-struct GameState
-{
-    u32 pad;
 };
 
 #endif

@@ -4,6 +4,7 @@
 #include <math.h>
 
 #define EPSILON 0.0001f
+#define BSP_EPSILON 0
 #define PI 3.14159265359
 #define TO_RAD(value) ((value/180.0f) * PI)
 #define TO_DEG(value) ((value/PI) * 180.0f)

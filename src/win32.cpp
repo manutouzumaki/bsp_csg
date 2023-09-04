@@ -9,6 +9,12 @@ static LRESULT CALLBACK WndProcA(HWND hWnd, UINT Msg, WPARAM wParam, LPARAM lPar
         gRunnig = false;
     } break;
 
+    case WM_MOVE:
+    {
+        gWindowX = (i32)LOWORD(lParam);
+        gWindowY = (i32)HIWORD(lParam);
+    }
+
     default:
     {
         result = DefWindowProcA(hWnd, Msg, wParam, lParam);
